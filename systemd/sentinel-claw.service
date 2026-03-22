@@ -1,0 +1,12 @@
+[Unit]
+Description=Sentinel Claw watchdog service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env sentinel-claw status
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
