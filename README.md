@@ -1,4 +1,4 @@
-# Sentinel Claw
+# WatchClaw
 
 Open-source host watchdog for OpenClaw systems.
 

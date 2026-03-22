@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sentinel-claw"
+name = "watchclaw"
 version = "0.1.0"
 description = "Security watchdog for OpenClaw hosts"
 readme = "README.md"
@@ -12,7 +12,7 @@ authors = [{ name = "JC + Sedna" }]
 dependencies = []
 
 [project.scripts]
-sentinel-claw = "sentinel_claw.cli:main"
+watchclaw = "watchclaw.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

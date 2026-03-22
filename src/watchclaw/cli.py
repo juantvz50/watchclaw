@@ -2,13 +2,13 @@ import argparse
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="sentinel-claw")
+    parser = argparse.ArgumentParser(prog="watchclaw")
     parser.add_argument("command", nargs="?", default="status")
     args = parser.parse_args()
     if args.command == "status":
-        print("sentinel-claw: scaffold ready")
+        print("watchclaw: scaffold ready")
     else:
-        print(f"sentinel-claw: unknown command {args.command}")
+        print(f"watchclaw: unknown command {args.command}")
         raise SystemExit(2)
 
 
