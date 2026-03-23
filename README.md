@@ -15,4 +15,17 @@ Initial focus:
 
 ## Status
 
-Early scaffold.
+First runnable listener slice is in place.
+
+## MVP usage
+
+```bash
+PYTHONPATH=src python3 -m watchclaw.cli status
+PYTHONPATH=src python3 -m watchclaw.cli run-once --config /etc/watchclaw/config.json
+```
+
+State written under `storage.base_dir`:
+
+- `state.json`
+- `events.jsonl`
+- `baselines/listeners.json`
