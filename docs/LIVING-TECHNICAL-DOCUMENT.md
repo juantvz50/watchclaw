@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft v0.1
+Draft v0.2
 Owner: JC (Project Manager)
 Technical counterpart: Sedna
 Project type: Open-source host watchdog for systems already running OpenClaw
@@ -11,158 +11,186 @@ Project type: Open-source host watchdog for systems already running OpenClaw
 
 ## 1. Purpose
 
-WatchClaw exists to monitor a Linux host in a way that is:
+WatchClaw exists to give a Linux operator a **calm, inspectable view of important host changes**.
+
+It should be:
 
 - lightweight
 - explainable
-- installable on an existing OpenClaw system
-- readable by humans
-- especially useful for LLM-assisted review and alerting
+- easy to install on an existing OpenClaw host
+- quiet by default
+- readable by both humans and LLMs
 
-The core idea is not to become a full SIEM, nor to wrap heavyweight security tooling blindly.
-The goal is to produce **structured, high-signal host observations** that can be:
+The product is not "security tooling in general".
+It is a **local baseline + diff + semantic event layer** for host state.
 
-- diffed
-- summarized
-- triaged
-- explained
-- escalated through OpenClaw
+Core promise:
+
+> WatchClaw should let an operator answer, with low stress: what changed, why it matters, and whether action is needed.
 
 ---
 
 ## 2. Product thesis
 
-Traditional host security tools are often good at one of two things:
+Most host security tooling is strong at raw collection, policy enforcement, or both.
+What is often missing on a personal server or small host is:
 
-1. collecting low-level signals very reliably
-2. enforcing specific security controls
+- a small install surface
+- a readable model of normal state
+- compact explanations of drift
+- predictable alerting behavior
+- outputs that are easy to hand to OpenClaw or an LLM for summary
 
-But they are often weaker at:
+WatchClaw should therefore be designed as:
 
-- summarizing what actually changed
-- correlating small host events into meaningful observations
-- producing compact operator-friendly explanations
-- adapting gracefully to a personal server/workstation context
-
-Humans are too slow and inconsistent for constant log review.
-Rule-only automation is fast but brittle.
-LLMs are good at reading large structured outputs quickly and turning them into useful judgments.
-
-Therefore WatchClaw should be designed as:
-
-> a baseline + diff + structured event engine for host state, optimized for LLM/OpenClaw interpretation
+> a trustable host change observer for OpenClaw systems
 
 Not as:
 
-- a generic SIEM clone
+- a SIEM clone
 - a full HIDS replacement
-- an enterprise compliance product
+- an enterprise compliance platform
 - a magical auto-remediator
 
 ---
 
-## 3. Project constraints
+## 3. Primary design constraints
 
-### 3.1 Must be installable on top of an existing OpenClaw host
+Everything should be evaluated through these lenses.
 
-Assume the target machine already has:
+### 3.1 Trazabilidad
 
-- Linux
-- Python available or installable
-- OpenClaw already running
-- outbound network access at least intermittently
+Every alert must be reconstructible from local facts.
 
-### 3.2 Must be understandable
+A user should be able to inspect:
 
-A user should be able to answer:
+- what WatchClaw watched
+- the previous baseline
+- the current observation
+- the rule that turned a diff into an event
+- whether the event was deduped, suppressed, or escalated
 
-- what WatchClaw is watching
-- how it decides something changed
-- why an alert was emitted
-- how to rebuild baseline safely
+No opaque "AI said this looks bad" logic in the MVP.
+LLMs may summarize events later, but they should not be the origin of truth.
 
-### 3.3 Must degrade gracefully
+### 3.2 Ease of mind
 
-If any optional integration fails:
+The operator experience should feel calm.
 
-- WatchClaw should still collect locally
-- state should remain readable
-- alerts can be retried or summarized later
+That means:
 
-### 3.4 Must prefer high-signal over high-volume
+- quiet defaults
+- a small number of well-defined sensors
+- severity that matches actual operator urgency
+- repeat events deduped instead of spammed
+- installation and uninstall that do not feel risky
 
-We care more about:
+The product should reduce background anxiety, not create more of it.
 
-- meaningful diffs
-- host changes
-- suspicious transitions
-- actionable summaries
+### 3.3 Simpleza
 
-than about collecting every kernel-level event from day one.
+The MVP should use the fewest moving parts that can still deliver value.
+
+Prefer:
+
+- timer-based execution over daemon complexity
+- local files over database complexity
+- semantic events over raw log shipping
+- a small trusted surface over broad feature coverage
 
 ---
 
-## 4. Non-goals
+## 4. Install contract
 
-At least for the MVP, WatchClaw is **not** trying to be:
+The MVP assumes the target machine already has:
+
+- Linux
+- Python available or installable
+- systemd
+- OpenClaw already running
+- intermittent outbound network access at most
+
+WatchClaw should still be useful if OpenClaw delivery fails.
+Local collection and local state are the primary contract.
+Remote alerting is secondary.
+
+Installation should feel reversible and low-risk:
+
+1. install package
+2. initialize config and state paths
+3. enable a `systemd` timer
+4. inspect what it is watching
+
+Uninstall should leave the host in a legible state with no hidden components.
+
+---
+
+## 5. Non-goals
+
+For the MVP, WatchClaw is **not** trying to be:
 
 - Wazuh replacement
 - osquery replacement
 - auditd replacement
 - EDR/XDR platform
 - incident response suite
-- automatic hardening tool
+- hardening framework
 - active network IDS
 - malware scanner
-- filebeat/logstash pipeline clone
+- remote fleet manager
+- enterprise dashboard
+- cloud control plane
+- automatic remediation system
 
 Also out of scope for MVP:
 
-- full policy enforcement
-- automated remediation by default
-- multi-host fleet management
-- complicated cloud control plane
-- enterprise dashboards
-- compliance frameworks
+- policy enforcement
+- deep kernel telemetry
+- mandatory heavyweight integrations
+- high-frequency streaming pipelines
+- broad compliance mapping
+
+If a feature increases install burden, noise, or conceptual sprawl without clearly improving trust, it should wait.
 
 ---
 
-## 5. Architectural position
+## 6. Architectural position
 
-WatchClaw should sit in the following layer stack:
+WatchClaw should sit between native host truth and operator-facing explanation.
 
 ### Layer A — System truth
-Native host interfaces and existing tools:
+
+Native interfaces and standard tools, such as:
 
 - `journalctl`
-- auth logs / journald units
+- auth logs / journald auth units
 - `ss`
 - `systemctl`
 - cron data
-- passwd/group/sudo/ssh files
-- filesystem metadata / hashes
-- optionally:
-  - AIDE
-  - minimal auditd
-  - fail2ban state/signals
+- selected files in `/etc` and SSH locations
 
-### Layer B — WatchClaw collection and normalization
-WatchClaw gathers:
+Optional later providers may include:
+
+- AIDE
+- minimal auditd signals
+- fail2ban state
+
+These are inputs, not product identity.
+
+### Layer B — Collection and normalization
+
+WatchClaw gathers a small set of observations:
 
 - snapshots
 - incremental journal reads
 - selected file integrity state
-- selected system object state
+- selected scheduler and service state
 
-Then normalizes them into structured records.
+Then it normalizes them into deterministic records.
 
-### Layer C — Baseline and diff engine
-WatchClaw compares:
+### Layer C — Baseline and diff
 
-- previous known state
-- current observed state
-
-and produces semantic events such as:
+WatchClaw compares current observation against stored baseline and emits semantic events such as:
 
 - `new_listener`
 - `service_failed`
@@ -171,111 +199,57 @@ and produces semantic events such as:
 - `sensitive_file_hash_changed`
 - `new_timer_unit`
 
-### Layer D — Interpretation / alert routing
+### Layer D — Routing and explanation
+
 Events can then be:
 
-- deduplicated
+- deduped
 - grouped
-- scored
+- severity-mapped
 - summarized
-- routed to OpenClaw for human-facing alerting
+- handed to OpenClaw
 
 ### Layer E — Human / LLM consumption
-Final output should be:
 
-- compact
-- explainable
-- suitable for Telegram alerts
-- suitable for daily digest
-- suitable for LLM summarization without drowning in raw logs
+Final output must be compact, explainable, and digest-friendly.
 
 ---
 
-## 6. Why not start with heavyweight tooling?
+## 7. MVP shape
 
-Because the project value is not “we know many existing security tool names.”
-The value is a system that:
+### 7.1 Runtime model
 
-- is easy to install
-- is easy to understand
-- provides high-leverage visibility
-- integrates naturally with OpenClaw
-- keeps state compact enough for machine summarization
+The MVP should use a **periodic runner via `systemd` timer**.
 
-Heavyweight stacks tend to introduce early penalties:
+Why this is the right default:
 
-- too much configuration
-- too much data
-- too many moving parts
-- reduced explainability
-- increased operator fatigue
-- pressure to support a broad problem space too soon
+- easier to trust
+- easier to debug
+- easier to uninstall
+- naturally aligned with snapshot + diff logic
+- avoids daemon lifecycle complexity
 
-This does **not** mean existing tools are useless.
-It means they should be treated as optional signal providers, not as the product core.
+A permanent daemon is not justified until the timer model clearly fails operationally.
 
----
-
-## 7. Proposed technical direction
-
-## 7.1 Language
+### 7.2 Language
 
 Primary language: **Python**
 
-Reasoning:
-
-- fastest path to implementation
-- easy subprocess integration with Linux tooling
-- easy JSON/state handling
-- easy hashing/parsing/diffing
-- easy packaging for existing Linux hosts
-- good fit for OpenClaw-adjacent scripting
-
-At current project stage, Python is favored over Go/Rust because:
-
-- speed of iteration matters more than binary purity
-- the hard part is system design and signal modeling, not raw throughput
-- subprocess + structured parsing is enough for MVP scale
-
----
-
-## 7.2 Runtime model
-
-Preferred model:
-
-- long-lived lightweight service **or** periodic `systemd` timer execution
-
-Initial recommendation:
-
-### MVP recommendation
-Use a **periodic runner** via `systemd timer`.
-
 Why:
 
-- simpler to reason about
-- easier install/uninstall
-- easier debugging
-- natural fit for snapshot + diff design
-- avoids daemon complexity too early
+- fastest implementation path
+- easy subprocess integration with Linux tools
+- easy JSON/JSONL handling
+- simple packaging for existing hosts
+- enough performance for MVP scope
 
-Potential cadence:
+The main problem is signal modeling and explainable state, not raw throughput.
 
-- every 1 minute for journal/incremental auth checks
-- every 5 minutes for snapshots like listeners/services
-- every 15–60 minutes for heavier integrity checks depending on configuration
+### 7.3 Storage model
 
-We do not need a permanent daemon on day one unless latency requirements tighten.
+Use transparent local files first.
 
----
-
-## 7.3 State model
-
-WatchClaw needs a durable local state store.
-
-### Initial recommendation
-Use local JSON/JSONL plus deterministic files.
-
-Suggested structure:
+Suggested layout:
 
 ```text
 /var/lib/watchclaw/
@@ -289,132 +263,210 @@ Suggested structure:
     users.json
 ```
 
-### Principles
-- baseline must be inspectable by humans
+Principles:
+
+- state must be human-inspectable
 - event history must be append-friendly
-- last processed journal cursor must be stored
+- journal cursor must be explicit
 - dedupe state must be explicit
 - no opaque binary state in MVP
 
-If scale later justifies it, move to SQLite.
-But not before the data model is proven.
+SQLite may be reasonable later, but only after the data model is proven.
 
 ---
 
-## 8. MVP functional scope
+## 8. MVP sensors
 
-## 8.1 SSH / auth monitoring
+The MVP should stay narrow. The goal is confidence, not coverage theater.
+
+### 8.1 SSH / auth monitoring
 
 Goal: detect meaningful remote access activity.
 
 Signals:
+
 - successful SSH login
-- failed SSH login bursts
+- failed SSH burst
 - login from IP not seen before
 - invalid user attempts
-- root login attempts
-- sudo usage signals (carefully filtered)
+- root login attempts or success
+- selected sudo usage signals
 
-Source:
-- `journalctl` or auth logs, depending on distro
+Outputs:
 
-Output examples:
 - `ssh_login_success`
 - `ssh_login_new_ip`
 - `ssh_failed_burst`
 - `ssh_invalid_user_attempt`
+- `root_login_attempt`
 
----
+### 8.2 Sensitive file integrity
 
-## 8.2 Sensitive file integrity monitoring
-
-Goal: notice high-value config/auth changes.
+Goal: notice changes to high-value local trust boundaries.
 
 Initial watched paths:
+
 - `/etc/ssh/sshd_config`
 - `/etc/passwd`
 - `/etc/group`
 - `/etc/sudoers`
 - `/etc/crontab`
 - `/root/.ssh/authorized_keys`
-- important user `authorized_keys` files
+- selected user `authorized_keys`
 - selected systemd unit files or overrides
 
 Method:
-- file existence
+
+- existence check
 - metadata snapshot
 - content hash snapshot
 
-Output examples:
+Outputs:
+
 - `sensitive_file_hash_changed`
 - `ssh_key_added`
 - `watched_file_deleted`
 
----
+### 8.3 Listener / exposure monitoring
 
-## 8.3 Listener / exposure monitoring
-
-Goal: detect new listening sockets or important exposure changes.
+Goal: detect new or removed listening sockets.
 
 Signals:
+
 - new TCP/UDP listener
-- listener disappeared unexpectedly
-- process associated with listener changed
+- listener removed
+- process for listener changed
 
-Sources:
+Source:
+
 - `ss -ltnup`
-- `systemctl list-sockets` when useful
 
-Output examples:
+Outputs:
+
 - `new_listener`
 - `listener_removed`
 - `listener_process_changed`
 
----
+### 8.4 systemd / persistence monitoring
 
-## 8.4 systemd / service monitoring
-
-Goal: notice service failures and newly introduced persistence.
+Goal: notice failures and new persistence paths.
 
 Signals:
+
 - service failed
 - service newly enabled
 - timer newly enabled
 - path unit newly enabled
-- suspicious unit changes in baseline
+- suspicious unit drift
 
 Sources:
+
 - `systemctl list-units`
 - `systemctl list-unit-files`
 - `systemctl list-timers`
 
-Output examples:
+Outputs:
+
 - `service_failed`
 - `new_enabled_service`
 - `new_timer_unit`
 
----
+### 8.5 Cron / scheduled task monitoring
 
-## 8.5 Cron / scheduled task monitoring
-
-Goal: detect newly introduced scheduled execution paths.
+Goal: detect newly introduced scheduled execution.
 
 Signals:
-- `/etc/crontab` change
-- cron.d changes
-- user crontab changes (if configured)
 
-Output examples:
+- `/etc/crontab` changed
+- `cron.d` changed
+- selected user crontabs changed, if configured
+
+Outputs:
+
 - `cron_changed`
 - `new_cron_entry`
 
 ---
 
-## 9. Event model
+## 9. Deliberate exclusions from the MVP
 
-Every emitted event should be structured.
+Even if tempting, do not add these to the first release:
 
-Proposed minimum schema:
+- auditd policy complexity as a default requirement
+- AIDE as a required dependency
+- multi-host management
+- web dashboard
+- auto-remediation
+- remote command execution
+- high-volume raw log export
+- probabilistic ML detection layers
+
+WatchClaw earns trust by being inspectable first.
+Breadth can come later.
+
+---
+
+## 10. Baseline model
+
+The baseline is a first-class product surface.
+
+Rules:
+
+- baseline files must be readable by an operator
+- baseline creation must be explicit
+- baseline rebuild must be explicit
+- WatchClaw must distinguish between "first observation" and "drift from known state"
+- re-baselining should be a conscious operator action, not a silent side effect
+
+### Baseline lifecycle
+
+1. first run records initial known-good state
+2. future runs compare current state against that baseline
+3. meaningful differences emit semantic events
+4. operator can review drift
+5. operator may intentionally accept new normal via re-baseline
+
+The system must never make the operator wonder whether a change was silently absorbed.
+
+---
+
+## 11. Why did this alert happen?
+
+Every event should answer this question directly.
+
+Minimum explanation contract for an alert:
+
+- **what was observed now**
+- **what was previously known**
+- **what rule matched**
+- **why severity was assigned**
+- **whether this is new or repeated**
+
+Example shape:
+
+```json
+{
+  "kind": "new_listener",
+  "summary": "New listening socket detected on 0.0.0.0:9000",
+  "why": {
+    "observed": "0.0.0.0:9000/tcp owned by python3 pid 1234",
+    "baseline": "port not present in previous listener baseline",
+    "rule": "emit new_listener when current listener key is absent from prior baseline",
+    "severity_reason": "warning because new network exposure exists",
+    "dedupe": "first occurrence in current dedupe window"
+  }
+}
+```
+
+If an operator cannot reconstruct the event from local state, the design is wrong.
+
+---
+
+## 12. Event model
+
+Every emitted event should be structured and compact.
+
+Minimum schema:
 
 ```json
 {
@@ -432,21 +484,23 @@ Proposed minimum schema:
     "process": "python3",
     "pid": 1234
   },
-  "baseline": {...},
-  "current": {...},
+  "baseline": {},
+  "current": {},
+  "why": {},
   "dedupe_key": "new_listener:0.0.0.0:9000:python3"
 }
 ```
 
-### Design rules
+Design rules:
+
 - every event must be explainable from source facts
 - every event must support deterministic dedupe
-- every event should carry enough context for Telegram summary
-- every event should be compact enough for LLM summarization
+- every event should fit Telegram-sized summary generation
+- every event should be compact enough for batch LLM summarization
 
 ---
 
-## 10. Severity model
+## 13. Severity and noise model
 
 Initial severities:
 
@@ -454,210 +508,174 @@ Initial severities:
 - `warning`
 - `critical`
 
-### Examples
+### Severity examples
+
 #### info
-- known service restarted cleanly
-- previously seen IP login
+
+- known service restart
+- SSH login from known IP
+- non-sensitive watched file metadata drift with no content change
 
 #### warning
+
 - new listener
 - new timer
 - failed login burst
-- systemd unit drift
+- systemd drift
+- cron drift
 
 #### critical
-- change to sudoers
+
+- change to `sudoers`
 - new authorized key
 - root login success
 - sensitive file deletion
 - suspicious new privileged persistence
 
-Severity should be rule-driven but overrideable by configuration.
+### Noise-control rules
+
+- dedupe repeated identical events within a configurable window
+- default to digest for `info`
+- avoid paging on every failed login line; aggregate bursts
+- do not emit events for source noise that cannot be explained clearly
+- prefer one good alert over ten raw ones
+
+Ease of mind matters as much as detection quality.
+A noisy system is a system that stops being trusted.
 
 ---
 
-## 11. LLM/OpenClaw fit
+## 14. OpenClaw integration
 
-This is the strategic core.
-
-WatchClaw should optimize for three machine-consumption modes:
-
-### A. Direct alerting
-Short message suitable for Telegram.
-
-### B. Batch summarization
-A digest of all meaningful events over a window.
-
-### C. Explainability
-An LLM should be able to answer:
-- what changed?
-- why does it matter?
-- what should the operator do next?
-
-Therefore WatchClaw should prefer:
-- semantic events over raw log blobs
-- baseline diffs over endless line-by-line dumps
-- compact structured payloads over giant log exports
-
-This is why the project should not center itself around massive tool outputs unless they are distilled first.
-
----
-
-## 12. Integration with OpenClaw
-
-WatchClaw should assume OpenClaw already exists on the host.
+OpenClaw is an integration surface, not the local source of truth.
 
 ### Good roles for OpenClaw
-- deliver Telegram alerts
-- answer natural language questions about recent events
-- summarize security activity
-- help re-baseline or explain drift
+
+- deliver alerts
+- produce a daily or hourly digest
+- answer natural-language questions about recent events
+- help explain drift to the operator
 
 ### Bad roles for OpenClaw
-- raw log collector
-- sole detection engine
-- privileged always-on kernel-level watcher
 
-### Architectural principle
-WatchClaw should produce durable structured state locally.
-OpenClaw should consume it when needed for communication and interpretation.
+- raw log sink
+- primary detection engine
+- privileged always-on host observer
 
----
+Architectural rule:
 
-## 13. Existing tools: stance
+> WatchClaw owns local truth. OpenClaw consumes WatchClaw output for communication and interpretation.
 
-## AIDE
-Use as optional integrity provider for users who want stronger file integrity checks.
-Do not require it for MVP.
-
-## auditd
-Use minimally if needed for a few high-value events.
-Do not make exhaustive auditd policy the default starting point.
-
-## fail2ban
-Treat as a complementary signal and mitigation layer, not as the core product.
-
-## osquery / Wazuh
-Do not make them mandatory.
-They may later become optional integrations, but not the baseline architecture.
-
----
-
-## 14. What not to do
-
-### 14.1 Do not start as a giant enterprise product
-No fleet manager.
-No giant web UI.
-No policy engine with 200 toggles.
-
-### 14.2 Do not depend entirely on external heavyweight tools
-Otherwise WatchClaw loses identity and becomes glue.
-
-### 14.3 Do not emit too many low-value alerts
-Alert fatigue kills trust fast.
-
-### 14.4 Do not hide baseline logic behind opaque abstractions
-The user must be able to inspect what “normal” means.
-
-### 14.5 Do not promise automatic remediation in MVP
-Detection and explainability first.
-Actions later, explicitly.
-
-### 14.6 Do not over-rotate on raw logs
-The product should produce observations, not just collect text.
+This keeps the host behavior understandable even if messaging or LLM layers fail.
 
 ---
 
 ## 15. Installation philosophy
 
-Installation should feel like:
+Installation should feel boring in the best way.
 
-- Python package install
-- config init
-- systemd unit/timer enable
-- optional OpenClaw integration enablement
-
-Target shape:
+Target operator flow:
 
 ```bash
 pip install watchclaw
 watchclaw init
 sudo watchclaw install-systemd
 sudo systemctl enable --now watchclaw.timer
+watchclaw status
+watchclaw explain-baseline
 ```
 
-This may change, but the principle stands:
+Principles:
+
 - easy to install
 - easy to remove
 - easy to inspect
+- easy to confirm what is active
+
+The first install experience should answer three questions quickly:
+
+- where is state stored?
+- what is being watched?
+- how often does it run?
 
 ---
 
-## 16. MVP recommendation (final)
+## 16. MVP recommendation
 
-### Build this first
-A Python-based, systemd-timer-driven host observer that:
+Build this first:
+
+A Python-based, `systemd`-timer-driven host observer that:
 
 - reads journal incrementally
-- snapshots selected system state
-- diffs against a local baseline
+- snapshots selected host state
+- diffs against explicit local baselines
 - emits compact semantic events
-- stores state locally in transparent files
-- supports OpenClaw-facing alert consumption
+- stores all state locally in transparent files
+- lets OpenClaw consume alerts without making OpenClaw mandatory for core function
 
-### Specifically include in MVP
-- auth/SSH monitoring
+### Include in MVP
+
+- auth / SSH monitoring
 - sensitive file hashing
 - listener diffing
-- systemd/timer drift
+- systemd and timer drift
 - cron drift
-- basic severity assignment
+- severity mapping
 - dedupe
 - local event log
+- explicit explainability fields for each event
 
-### Specifically exclude from MVP
-- heavy web UI
-- full remediation
+### Exclude from MVP
+
+- daemon-first runtime
+- heavy UI
 - mandatory auditd policies
-- mandatory Wazuh/osquery
-- complicated remote cloud control plane
+- mandatory Wazuh/osquery/AIDE
+- auto-remediation
+- fleet control plane
 - deep kernel telemetry
 
 ---
 
 ## 17. Immediate next engineering step
 
-The next technical artifact should be:
+The next technical artifact should not be broad implementation.
+It should be the **contract surface** for the first runnable slice.
 
-1. a precise config schema
-2. a state schema
+Build order:
+
+1. config schema
+2. state schema
 3. event type definitions
-4. the first runnable collector cycle
+4. one runnable collector cycle
 
-Recommended build order:
+Recommended first runnable slice:
 
-1. config + state model
-2. listener snapshot collector
-3. sensitive file hash collector
-4. journal incremental reader
-5. event emitter + JSONL storage
-6. severity/dedupe layer
-7. OpenClaw alert integration
+1. listener snapshot collector
+2. explicit baseline file for listeners
+3. `new_listener` / `listener_removed` event emission
+4. JSONL event store
+5. minimal `watchclaw explain <event-id>` path
+
+Why this slice first:
+
+- easy to verify locally
+- easy to explain
+- immediately tests baseline, diff, event, and dedupe design
+- low install and debugging complexity
 
 ---
 
-## 18. PM note
+## 18. Final product stance
 
-As of this draft, the product direction is clear enough to proceed.
+If WatchClaw stays disciplined, it can become:
 
-If the project stays disciplined, WatchClaw can become:
+- a small but sharp open-source tool
+- easier to trust than heavyweight stacks for personal hosts
+- a strong substrate for OpenClaw-assisted security review
 
-- a small but very sharp open-source tool
-- clearly differentiated from heavyweight security stacks
-- genuinely useful in LLM-assisted personal server operations
+If it expands too early, it will become noisy and vague.
 
-If the project tries to do everything, it will become noise.
+The correct direction is:
 
-The correct path is:
-
-**compact, legible, baseline-driven host awareness for OpenClaw systems.**
+**compact, legible, baseline-driven host awareness for OpenClaw systems, with explicit reasoning and calm defaults.**
