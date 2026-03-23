@@ -14,3 +14,7 @@ What changed:
 
 Next concrete engineering step:
 - define the config/state/event contracts and implement the first runnable listener collector slice (`ss` snapshot -> baseline diff -> `new_listener` / `listener_removed` -> JSONL event storage -> basic explain path)
+
+## Design note
+
+A future enrichment layer should support lightweight per-service research saved as local markdown profiles (for example under a local services directory). This should stay optional and must not become a runtime dependency of core detection.

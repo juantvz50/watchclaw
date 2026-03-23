@@ -64,7 +64,7 @@ None right now.
 ## Pending decisions from JC
 
 - None active at this exact step.
-- Next likely decision: JSON/JSONL-only MVP vs introducing SQLite early.
+- Next likely decision: whether the lightweight per-service research profile layer enters immediately after core detectors or waits until after auth/file slices.
 
 ## Next checkpoint
 
