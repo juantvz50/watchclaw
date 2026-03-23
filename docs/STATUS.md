@@ -5,7 +5,7 @@
 Refined `docs/LIVING-TECHNICAL-DOCUMENT.md` to make the MVP calmer and narrower.
 
 What changed:
-- centered the document on three operating lenses: trazabilidad, ease of mind, simpleza
+- centered the document on three operating lenses: Traceability, Peace of mind, Simplicity
 - tightened the MVP around a timer-based local observer with transparent state
 - made baseline behavior and re-baselining explicit
 - added a concrete "why did this alert happen?" contract for explainability

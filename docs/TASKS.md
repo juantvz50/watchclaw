@@ -34,19 +34,19 @@ Turn the initial technical direction into a smaller, sharper MVP that is:
 - [ ] Mark sections that feel too broad, heavy, or premature
 - [ ] Mark sections that are not directly serving the MVP
 
-### P2. Tighten for trazabilidad
+### P2. Tighten for Traceability
 - [ ] Ensure baseline/state logic is explicit and inspectable
 - [ ] Ensure every proposed event type is explainable from source facts
 - [ ] Ensure alert reasoning can be reconstructed from local state
 - [ ] Add a short section describing "why did this alert happen?"
 
-### P3. Tighten for ease of mind
+### P3. Tighten for Peace of mind
 - [ ] Reduce anything that would likely create alert fatigue
 - [ ] Clarify defaults that should be quiet and safe
 - [ ] Add guidance for severity thresholds and deduplication
 - [ ] Add operator experience principles for alert wording
 
-### P4. Tighten for simpleza
+### P4. Tighten for Simplicity
 - [ ] Remove any design element that smells like premature SIEM complexity
 - [ ] Prefer timer-based execution over daemon complexity unless proven needed
 - [ ] Keep storage simple and inspectable in MVP
@@ -73,7 +73,7 @@ Turn the initial technical direction into a smaller, sharper MVP that is:
 - [ ] Define info / warning / critical
 - [ ] Define what should page immediately vs wait for digest
 - [ ] Define anti-noise rules
-- [ ] Define what "ease of mind" means operationally
+- [ ] Define what "Peace of mind" means operationally
 
 ### P8. Define install philosophy
 - [ ] Create `docs/INSTALLATION.md`
@@ -157,9 +157,14 @@ Turn the initial technical direction into a smaller, sharper MVP that is:
 ## Immediate next actions
 
 ### Next up
-- [ ] Re-iterate the living technical document from trazabilidad / ease of mind / simpleza
+- [ ] Re-iterate the living technical document from Traceability / Peace of mind / Simplicity
 - [ ] Push revised version
 - [ ] Then create `docs/MVP.md`
+
+### Current active thread
+- [ ] WatchClaw document iteration is the current active workstream.
+- [ ] After that, move immediately into `docs/MVP.md`.
+- [ ] If implementation starts before more PM input arrives, default to config/state/event schema work rather than broad feature expansion.
 
 ---
 
