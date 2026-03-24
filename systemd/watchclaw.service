@@ -1,18 +1,8 @@
 [Unit]
-Description=WatchClaw one-shot host watchdog scan
-Documentation=https://github.com/jcestevezr/watchclaw
-Wants=network-online.target
+Description=WatchClaw host watchdog scan
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=root
-Group=root
-ExecStart=@WATCHCLAW_BIN@ run-once --config @WATCHCLAW_CONFIG@
-Nice=10
-
-# WatchClaw reads local auth logs/journal, listener state, and writes baselines/events
-# under storage.base_dir from the config file.
-
-[Install]
-WantedBy=multi-user.target
+ExecStart=/usr/bin/env python3 -m watchclaw.cli run-once --config @WATCHCLAW_CONFIG@

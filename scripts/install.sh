@@ -116,12 +116,10 @@ log "installing WatchClaw package from $REPO_ROOT"
   "${PIP_ARGS[@]}"
 )
 
-WATCHCLAW_BIN="$(command -v watchclaw || true)"
-if [[ -z "$WATCHCLAW_BIN" && -x "/usr/local/bin/watchclaw" ]]; then
-  WATCHCLAW_BIN="/usr/local/bin/watchclaw"
+WATCHCLAW_CLI=(python3 -m watchclaw.cli)
+if ! python3 -m watchclaw.cli --help >/dev/null 2>&1; then
+  fail "installed watchclaw module is not runnable via python3 -m watchclaw.cli"
 fi
-[[ -n "$WATCHCLAW_BIN" ]] || fail "watchclaw CLI was not found in PATH after installation"
-[[ -x "$WATCHCLAW_BIN" ]] || fail "installed watchclaw CLI is not executable: $WATCHCLAW_BIN"
 
 CONFIG_DIR="$(dirname "$CONFIG_PATH")"
 SYSTEMD_DIR="/etc/systemd/system"
@@ -143,7 +141,7 @@ else
   done
 
   log "writing config to $CONFIG_PATH"
-  "$WATCHCLAW_BIN" "${CONFIG_ARGS[@]}"
+  "${WATCHCLAW_CLI[@]}" "${CONFIG_ARGS[@]}"
   install -m 0644 "$TMP_CONFIG" "$CONFIG_PATH"
   rm -f "$TMP_CONFIG"
 fi
@@ -153,7 +151,6 @@ log "installing systemd units"
 [[ -f "$TIMER_TEMPLATE" ]] || fail "missing timer template: $TIMER_TEMPLATE"
 
 sed \
-  -e "s|@WATCHCLAW_BIN@|$WATCHCLAW_BIN|g" \
   -e "s|@WATCHCLAW_CONFIG@|$CONFIG_PATH|g" \
   "$SERVICE_TEMPLATE" > "$SERVICE_PATH"
 install -m 0644 "$TIMER_TEMPLATE" "$TIMER_PATH"
@@ -163,7 +160,7 @@ log "reloading systemd"
 systemctl daemon-reload
 
 log "running first scan"
-"$WATCHCLAW_BIN" run-once --config "$CONFIG_PATH"
+"${WATCHCLAW_CLI[@]}" run-once --config "$CONFIG_PATH"
 
 log "enabling and starting timer"
 systemctl enable --now watchclaw.timer
@@ -172,14 +169,14 @@ cat <<EOF
 
 WatchClaw install complete.
 
-Installed CLI: $WATCHCLAW_BIN
+Installed entrypoint: python3 -m watchclaw.cli
 Config:        $CONFIG_PATH
 State dir:     $STATE_DIR
 Service unit:  $SERVICE_PATH
 Timer unit:    $TIMER_PATH
 
 Verification hints:
-  watchclaw status --config $CONFIG_PATH
+  python3 -m watchclaw.cli status --config $CONFIG_PATH
   systemctl status watchclaw.timer watchclaw.service
   systemctl list-timers watchclaw.timer
   journalctl -u watchclaw.service -n 50 --no-pager
