@@ -11,6 +11,14 @@ Get WatchClaw onto an existing Linux host in a way that is easy to inspect, easy
 - A systemd timer is the default runtime model.
 - Root is the practical runtime user for the current auth/log/listener slices.
 
+## Quick Debian/Ubuntu prerequisites
+
+If the host is missing basic tooling, install the common prerequisites first:
+
+```bash
+sudo apt update && sudo apt install -y python3 python3-pip iproute2 systemd
+```
+
 ## System requirements
 
 Required:
