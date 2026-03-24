@@ -17,7 +17,8 @@ WatchClaw is the local observation layer: it snapshots host state, writes transp
 System requirements:
 - Linux host with `systemd`
 - Python 3.10+
-- `python3 -m pip` available
+- `python3 -m venv` available
+- `pip3` available inside the virtual environment
 - `ss` available (`iproute2` on most distros)
 - root runtime/install access for auth logs / journal and full listener visibility
 - `journalctl` recommended for auth monitoring; without it, logfile fallback is used
@@ -25,8 +26,14 @@ System requirements:
 Recommended install from a source checkout:
 
 ```bash
-cd /path/to/watchclaw
-sudo ./scripts/install.sh \
+git clone <repo-url>
+cd watchclaw
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
+pip3 install .
+sudo bash scripts/install.sh \
+  --venv "$(pwd)/.venv" \
   --host-id "$(hostname)" \
   --watch-file /etc/ssh/sshd_config \
   --watch-file /etc/sudoers
@@ -34,10 +41,11 @@ sudo ./scripts/install.sh \
 
 What the installer does, explicitly:
 - validates the host prerequisites
-- installs the package from the current checkout with `python3 -m pip install --prefix /usr/local .`
+- uses the already-prepared virtual environment you pass with `--venv` (or `./.venv` by default)
 - writes or preserves `/etc/watchclaw/config.json`
 - creates `/var/lib/watchclaw`
-- installs `watchclaw.service` and `watchclaw.timer`
+- renders `watchclaw.service` with the real venv entrypoint and chosen config path
+- installs `watchclaw.timer`
 - runs one `watchclaw run-once`
 - enables and starts the timer
 
@@ -46,7 +54,10 @@ If you want to inspect or reproduce the steps manually, read `scripts/install.sh
 For local development only, editable install still works:
 
 ```bash
-python3 -m pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
+pip3 install -e .
 ```
 
 A checked-in sample config also exists at `examples/config.sample.json`.
@@ -141,8 +152,8 @@ If you install manually, render `systemd/watchclaw.service` by replacing:
 ```bash
 python3 -m unittest discover -s tests
 bash -n scripts/install.sh
-watchclaw status --config /etc/watchclaw/config.json
-sudo watchclaw run-once --config /etc/watchclaw/config.json
+.venv/bin/watchclaw status --config /etc/watchclaw/config.json
+sudo .venv/bin/watchclaw run-once --config /etc/watchclaw/config.json
 sudo systemctl status watchclaw.timer watchclaw.service
 sudo journalctl -u watchclaw.service -n 50 --no-pager
 ```

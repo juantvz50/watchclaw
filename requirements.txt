@@ -1,0 +1,4 @@
+# Keep this intentionally small.
+# Install these into your virtual environment first, then install WatchClaw itself.
+setuptools>=68
+wheel

@@ -5,4 +5,4 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/env python3 -m watchclaw.cli run-once --config @WATCHCLAW_CONFIG@
+ExecStart=@WATCHCLAW_BIN@ run-once --config @WATCHCLAW_CONFIG@
