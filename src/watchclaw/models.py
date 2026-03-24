@@ -25,11 +25,15 @@ class WatchClawConfig:
     base_dir: str
     listeners_enabled: bool = True
     listeners_command: tuple[str, ...] = ("ss", "-ltnup")
+    watched_files: tuple[str, ...] = ()
 
 
 DEFAULT_CONFIG = {
     "host_id": "localhost",
     "storage": {"base_dir": "/var/lib/watchclaw"},
-    "collection": {"listeners": {"enabled": True, "command": ["ss", "-ltnup"]}},
+    "collection": {
+        "listeners": {"enabled": True, "command": ["ss", "-ltnup"]},
+        "files": {"paths": []},
+    },
     "runtime": {"mode": "timer"},
 }

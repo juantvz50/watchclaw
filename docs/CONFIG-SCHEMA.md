@@ -2,10 +2,11 @@
 
 ## Goal
 
-Define the smallest configuration surface needed for the first runnable WatchClaw slice.
+Define the smallest configuration surface needed for the current runnable WatchClaw slices.
 
 The MVP should configure only what is necessary to:
 - collect listener snapshots
+- collect watched-file snapshots
 - persist baseline/state locally
 - emit JSONL events
 - keep future expansion possible without over-designing now
@@ -34,6 +35,9 @@ Development/local override may be allowed later, but the installation story shou
     "listeners": {
       "enabled": true,
       "command": ["ss", "-ltnup"]
+    },
+    "files": {
+      "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
     }
   },
   "runtime": {
@@ -108,6 +112,25 @@ Rules:
 
 ---
 
+### `collection.files.paths`
+
+Type:
+- string array
+
+Purpose:
+- exact file paths to snapshot for integrity monitoring
+
+MVP expectation:
+- empty by default
+- operator opt-in for the first file-integrity slice
+
+Rules:
+- paths should be explicit and human-auditable
+- missing files are still tracked so create/delete drift is visible
+- no globs in MVP
+
+---
+
 ### `runtime.mode`
 
 Type:
@@ -126,11 +149,10 @@ Note:
 
 ## Not in MVP config yet
 
-Do **not** add these yet unless they become necessary for the first runnable slice:
+Do **not** add these yet unless they become necessary for the current runnable slices:
 
 - alert routing
 - severity overrides
-- watched file lists
 - cron watchers
 - journal filters
 - allowlists / denylists
@@ -148,4 +170,3 @@ These will come later when their first implementation slice exists.
 - Every field should map to real code already planned.
 - No speculative knobs.
 - No premature generalization.
-

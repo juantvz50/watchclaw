@@ -27,11 +27,14 @@ def load_config(path: str | Path | None = None) -> WatchClawConfig:
     if source_path.exists():
         raw = _merge_dicts(raw, json.loads(source_path.read_text()))
 
-    listeners = raw.get("collection", {}).get("listeners", {})
+    collection = raw.get("collection", {})
+    listeners = collection.get("listeners", {})
+    files = collection.get("files", {})
     storage = raw.get("storage", {})
     return WatchClawConfig(
         host_id=str(raw["host_id"]),
         base_dir=str(storage["base_dir"]),
         listeners_enabled=bool(listeners.get("enabled", True)),
         listeners_command=tuple(str(part) for part in listeners.get("command", ["ss", "-ltnup"])),
+        watched_files=tuple(str(path) for path in files.get("paths", [])),
     )

@@ -2,9 +2,9 @@
 
 ## Goal
 
-Define the smallest event model needed for the first WatchClaw runnable slice.
+Define the smallest event model needed for the current runnable WatchClaw slices.
 
-The first slice only needs to represent listener drift.
+The current runnable slices represent listener drift and watched-file integrity drift.
 
 ---
 
@@ -12,8 +12,9 @@ The first slice only needs to represent listener drift.
 
 - `new_listener`
 - `listener_removed`
-
-No other kinds should be emitted in the first runnable slice.
+- `watched_file_created`
+- `watched_file_deleted`
+- `sensitive_file_hash_changed`
 
 ---
 
@@ -59,14 +60,15 @@ No other kinds should be emitted in the first runnable slice.
 - one of:
   - `new_listener`
   - `listener_removed`
+  - `watched_file_created`
+  - `watched_file_deleted`
+  - `sensitive_file_hash_changed`
 
 ### `severity`
 - enum
 - MVP values:
   - `warning`
-
-Note:
-- severity expansion happens later
+  - `critical`
 
 ### `host_id`
 - string
@@ -78,7 +80,7 @@ Note:
 - short human-readable sentence
 
 ### `details`
-- normalized listener details
+- normalized source details for the changed listener or file
 
 ### `explain`
 - compact explanation of why the event exists
@@ -94,7 +96,7 @@ Every event in MVP must answer:
 
 1. What changed?
 2. Compared to what?
-3. From which source command?
+3. From which source snapshot?
 
 If an emitted event cannot answer those three questions cleanly, the event model is wrong.
 
@@ -102,9 +104,12 @@ If an emitted event cannot answer those three questions cleanly, the event model
 
 ## Severity stance
 
-For the first slice:
+For the current slices:
 - `new_listener` => `warning`
 - `listener_removed` => `warning`
+- `watched_file_created` => `warning`
+- `watched_file_deleted` => `critical`
+- `sensitive_file_hash_changed` => `critical`
 
 Do not over-model severity before more event types exist.
 
@@ -116,4 +121,3 @@ Do not over-model severity before more event types exist.
 - Events must be explainable from source facts.
 - Events must be compact enough for human and LLM reading.
 - Events must avoid raw log spam.
-

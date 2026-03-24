@@ -1,7 +1,14 @@
-import unittest
+from __future__ import annotations
 
-from watchclaw.engine import build_event, diff_listeners
-from watchclaw.models import ListenerRecord
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from watchclaw.engine import build_event, build_file_event, diff_files, diff_listeners, run_once
+from watchclaw.files import FileRecord
+from watchclaw.models import ListenerRecord, WatchClawConfig
 
 
 class EngineTest(unittest.TestCase):
@@ -22,6 +29,30 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(
             removed,
             [ListenerRecord(proto="udp", local_address="0.0.0.0", local_port=53, process_name=None, pid=None)],
+        )
+
+    def test_diff_files_finds_created_deleted_and_changed(self) -> None:
+        previous = [
+            FileRecord(path="/a", exists=True, sha256="old-a", size=1, mode=33188, mtime_ns=1),
+            FileRecord(path="/b", exists=True, sha256="same", size=1, mode=33188, mtime_ns=1),
+            FileRecord(path="/c", exists=False),
+        ]
+        current = [
+            FileRecord(path="/a", exists=True, sha256="new-a", size=1, mode=33188, mtime_ns=2),
+            FileRecord(path="/b", exists=False),
+            FileRecord(path="/c", exists=True, sha256="new-c", size=1, mode=33188, mtime_ns=2),
+        ]
+        created, deleted, changed = diff_files(previous, current)
+        self.assertEqual(created, [FileRecord(path="/c", exists=True, sha256="new-c", size=1, mode=33188, mtime_ns=2)])
+        self.assertEqual(deleted, [FileRecord(path="/b", exists=True, sha256="same", size=1, mode=33188, mtime_ns=1)])
+        self.assertEqual(
+            changed,
+            [
+                (
+                    FileRecord(path="/a", exists=True, sha256="old-a", size=1, mode=33188, mtime_ns=1),
+                    FileRecord(path="/a", exists=True, sha256="new-a", size=1, mode=33188, mtime_ns=2),
+                )
+            ],
         )
 
     def test_build_event_matches_contract(self) -> None:
@@ -48,6 +79,115 @@ class EngineTest(unittest.TestCase):
             },
         )
         self.assertEqual(event["dedupe_key"], "new_listener:tcp:127.0.0.1:8080:python3")
+
+    def test_build_file_event_matches_contract(self) -> None:
+        before = FileRecord(path="/etc/sudoers", exists=True, sha256="before", size=10, mode=33184, mtime_ns=1)
+        after = FileRecord(path="/etc/sudoers", exists=True, sha256="after", size=11, mode=33184, mtime_ns=2)
+        event = build_file_event(
+            "sensitive_file_hash_changed",
+            host_id="jc-server",
+            observed_at="2026-03-23T22:00:00Z",
+            previous=before,
+            current=after,
+        )
+        self.assertEqual(event["kind"], "sensitive_file_hash_changed")
+        self.assertEqual(event["severity"], "critical")
+        self.assertEqual(event["host_id"], "jc-server")
+        self.assertEqual(event["details"]["path"], "/etc/sudoers")
+        self.assertEqual(event["details"]["previous"]["sha256"], "before")
+        self.assertEqual(event["details"]["current"]["sha256"], "after")
+        self.assertEqual(event["explain"]["source"], "files.snapshot")
+        self.assertEqual(event["dedupe_key"], "sensitive_file_hash_changed:/etc/sudoers")
+
+    def test_run_once_persists_listener_and_file_baselines_and_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            base_dir = Path(tmp_dir)
+            watched_file = base_dir / "sudoers"
+            watched_file.write_text("v2")
+
+            listener_baseline = base_dir / "baselines" / "listeners.json"
+            listener_baseline.parent.mkdir(parents=True, exist_ok=True)
+            listener_baseline.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "captured_at": "2026-03-23T21:00:00Z",
+                        "listeners": [
+                            {
+                                "proto": "tcp",
+                                "local_address": "0.0.0.0",
+                                "local_port": 22,
+                                "process_name": "sshd",
+                                "pid": 100,
+                            }
+                        ],
+                    }
+                )
+            )
+            (base_dir / "baselines" / "files.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "captured_at": "2026-03-23T21:00:00Z",
+                        "files": [
+                            {
+                                "path": str(watched_file),
+                                "exists": True,
+                                "sha256": "old-hash",
+                                "size": 2,
+                                "mode": 33188,
+                                "mtime_ns": 1,
+                            },
+                            {
+                                "path": str(base_dir / 'deleted.txt'),
+                                "exists": True,
+                                "sha256": "gone",
+                                "size": 1,
+                                "mode": 33188,
+                                "mtime_ns": 1,
+                            },
+                        ],
+                    }
+                )
+            )
+
+            config = WatchClawConfig(
+                host_id="jc-server",
+                base_dir=str(base_dir),
+                listeners_enabled=True,
+                listeners_command=("ss", "-ltnup"),
+                watched_files=(str(watched_file), str(base_dir / "deleted.txt"), str(base_dir / "created.txt")),
+            )
+
+            created_file = FileRecord(path=str(base_dir / "created.txt"), exists=True, sha256="new", size=3, mode=33188, mtime_ns=3)
+            current_file = FileRecord(path=str(watched_file), exists=True, sha256="new-hash", size=2, mode=33188, mtime_ns=2)
+            missing_file = FileRecord(path=str(base_dir / "deleted.txt"), exists=False)
+            with patch(
+                "watchclaw.engine.collect_listener_snapshot",
+                return_value=[ListenerRecord(proto="tcp", local_address="127.0.0.1", local_port=8080, process_name="python3", pid=200)],
+            ), patch(
+                "watchclaw.engine.collect_file_snapshot",
+                return_value=[created_file, missing_file, current_file],
+            ):
+                result = run_once(config)
+
+            self.assertEqual(result, {"listeners": 1, "files": 3, "events": 5})
+
+            events = [json.loads(line) for line in (base_dir / "events.jsonl").read_text().splitlines()]
+            self.assertEqual(
+                sorted(event["kind"] for event in events),
+                [
+                    "listener_removed",
+                    "new_listener",
+                    "sensitive_file_hash_changed",
+                    "watched_file_created",
+                    "watched_file_deleted",
+                ],
+            )
+            files_baseline = json.loads((base_dir / "baselines" / "files.json").read_text())
+            self.assertEqual(len(files_baseline["files"]), 3)
+            state = json.loads((base_dir / "state.json").read_text())
+            self.assertEqual(state["host_id"], "jc-server")
 
 
 if __name__ == "__main__":

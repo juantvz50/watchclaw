@@ -2,10 +2,11 @@
 
 ## Goal
 
-Define the local state layout needed to support the first runnable listener-diff slice.
+Define the local state layout needed to support the current runnable slices.
 
 The MVP state must support:
 - previous listener baseline
+- previous watched-file baseline
 - event append log
 - simple recoverability
 
@@ -24,6 +25,7 @@ Initial expected files:
   events.jsonl
   baselines/
     listeners.json
+    files.json
 ```
 
 ---
@@ -81,6 +83,37 @@ Rules:
 
 ---
 
+## `baselines/files.json`
+
+Purpose:
+- store the last accepted watched-file snapshot
+
+Initial shape:
+
+```json
+{
+  "schema_version": 1,
+  "captured_at": "2026-03-23T22:00:00Z",
+  "files": [
+    {
+      "path": "/etc/sudoers",
+      "exists": true,
+      "sha256": "abc123",
+      "size": 1710,
+      "mode": 33184,
+      "mtime_ns": 1711234567890123456
+    }
+  ]
+}
+```
+
+Rules:
+- this is the source baseline for watched-file diffs
+- missing files remain explicit with `exists: false`
+- content hash is the primary content-drift signal in MVP
+
+---
+
 ## `events.jsonl`
 
 Purpose:
@@ -101,7 +134,6 @@ Rules:
 Do **not** add these until needed:
 - journal cursor state
 - dedupe caches
-- file-hash baselines
 - service/timer baselines
 - alert delivery receipts
 - cloud sync metadata
@@ -116,4 +148,3 @@ These belong to later slices.
 - Keep baseline separate from metadata.
 - Keep events append-only.
 - Prefer inspectability over abstraction.
-

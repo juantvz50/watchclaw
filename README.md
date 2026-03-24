@@ -29,3 +29,16 @@ State written under `storage.base_dir`:
 - `state.json`
 - `events.jsonl`
 - `baselines/listeners.json`
+- `baselines/files.json`
+
+Minimal file-integrity config:
+
+```json
+{
+  "collection": {
+    "files": {
+      "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
+    }
+  }
+}
+```

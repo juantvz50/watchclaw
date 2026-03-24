@@ -4,7 +4,7 @@ import argparse
 import json
 
 from .config import load_config
-from .engine import run_listener_slice
+from .engine import run_once
 
 
 def build_parser() -> argparse.ArgumentParser:
