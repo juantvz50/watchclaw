@@ -14,37 +14,42 @@ WatchClaw is the local observation layer: it snapshots host state, writes transp
 
 ## Install shape
 
-Requirements:
-- Linux host
+System requirements:
+- Linux host with `systemd`
 - Python 3.10+
-- `ss` available
-- `journalctl` recommended for auth monitoring
-- root or equivalent read access for auth logs / journal and listener visibility
+- `python3 -m pip` available
+- `ss` available (`iproute2` on most distros)
+- root runtime/install access for auth logs / journal and full listener visibility
+- `journalctl` recommended for auth monitoring; without it, logfile fallback is used
 
-Install in editable/dev form:
+Recommended install from a source checkout:
 
 ```bash
 cd /path/to/watchclaw
-python3 -m pip install -e .
-```
-
-Generate a starting config:
-
-```bash
-watchclaw init-config \
-  --output ./watchclaw.config.json \
+sudo ./scripts/install.sh \
   --host-id "$(hostname)" \
   --watch-file /etc/ssh/sshd_config \
   --watch-file /etc/sudoers
 ```
 
-Or print one without writing:
+What the installer does, explicitly:
+- validates the host prerequisites
+- installs the package from the current checkout with `python3 -m pip install --prefix /usr/local .`
+- writes or preserves `/etc/watchclaw/config.json`
+- creates `/var/lib/watchclaw`
+- installs `watchclaw.service` and `watchclaw.timer`
+- runs one `watchclaw run-once`
+- enables and starts the timer
+
+If you want to inspect or reproduce the steps manually, read `scripts/install.sh` and `docs/INSTALLATION.md`.
+
+For local development only, editable install still works:
 
 ```bash
-watchclaw print-default-config --host-id "$(hostname)"
+python3 -m pip install -e .
 ```
 
-A checked-in sample also exists at `examples/config.sample.json`.
+A checked-in sample config also exists at `examples/config.sample.json`.
 
 ## Minimal config
 
@@ -121,28 +126,21 @@ SSH/auth:
 
 ## systemd
 
-Real timer-based units live in `systemd/`:
-- `watchclaw.service` — one-shot scan using `watchclaw run-once --config /etc/watchclaw/config.json`
+Timer-based units live in `systemd/`:
+- `watchclaw.service` — template for a one-shot scan using `watchclaw run-once --config ...`
 - `watchclaw.timer` — runs every 5 minutes, persistent across reboots
 
-Typical install:
+`scripts/install.sh` renders the service with the actual installed `watchclaw` binary path and your chosen config path, then installs both units into `/etc/systemd/system/`.
 
-```bash
-sudo install -d /etc/watchclaw /var/lib/watchclaw
-sudo install -m 0644 examples/config.sample.json /etc/watchclaw/config.json
-sudo install -m 0644 systemd/watchclaw.service /etc/systemd/system/watchclaw.service
-sudo install -m 0644 systemd/watchclaw.timer /etc/systemd/system/watchclaw.timer
-sudo systemctl daemon-reload
-sudo systemctl enable --now watchclaw.timer
-sudo systemctl start watchclaw.service
-```
-
-Adjust `/etc/watchclaw/config.json` before enabling if you want a different `host_id`, `base_dir`, or watched files.
+If you install manually, render `systemd/watchclaw.service` by replacing:
+- `@WATCHCLAW_BIN@` with the real `watchclaw` executable path
+- `@WATCHCLAW_CONFIG@` with the real config path
 
 ## Validate the install
 
 ```bash
 python3 -m unittest discover -s tests
+bash -n scripts/install.sh
 watchclaw status --config /etc/watchclaw/config.json
 sudo watchclaw run-once --config /etc/watchclaw/config.json
 sudo systemctl status watchclaw.timer watchclaw.service
