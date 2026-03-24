@@ -15,7 +15,7 @@ Initial focus:
 
 ## Status
 
-First runnable listener slice is in place.
+Runnable listener, watched-file, and SSH auth-monitoring slices are in place.
 
 ## MVP usage
 
@@ -31,6 +31,8 @@ State written under `storage.base_dir`:
 - `baselines/listeners.json`
 - `baselines/files.json`
 
+`state.json` now also persists the last auth cursor / logfile offset so SSH/auth reads stay incremental across runs.
+
 Minimal file-integrity config:
 
 ```json
@@ -42,3 +44,22 @@ Minimal file-integrity config:
   }
 }
 ```
+
+Minimal auth config override:
+
+```json
+{
+  "collection": {
+    "auth": {
+      "enabled": true,
+      "journal_command": ["journalctl", "-q", "-o", "json", "--no-pager"],
+      "log_paths": ["/var/log/auth.log", "/var/log/secure"]
+    }
+  }
+}
+```
+
+Current SSH/auth events:
+- `ssh_login_success`
+- `ssh_invalid_user`
+- `ssh_failed_login_burst`

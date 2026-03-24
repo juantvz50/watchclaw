@@ -7,6 +7,7 @@ Define the local state layout needed to support the current runnable slices.
 The MVP state must support:
 - previous listener baseline
 - previous watched-file baseline
+- incremental SSH/auth cursor state
 - event append log
 - simple recoverability
 
@@ -42,7 +43,14 @@ Initial shape:
   "schema_version": 1,
   "host_id": "jc-server",
   "last_run_at": "2026-03-23T22:00:00Z",
-  "last_success_at": "2026-03-23T22:00:00Z"
+  "last_success_at": "2026-03-23T22:00:00Z",
+  "auth_cursor": {
+    "source": "journal",
+    "journal_cursor": "s=abc;i=123",
+    "file_path": null,
+    "file_offset": 0,
+    "file_inode": null
+  }
 }
 ```
 
@@ -50,6 +58,7 @@ Rules:
 - keep small
 - no duplicated baseline payloads here
 - no event history here
+- `auth_cursor` stores either a journal cursor or logfile offset/inode, depending on which source was used last
 
 ---
 
@@ -132,7 +141,6 @@ Rules:
 ## Not in MVP state yet
 
 Do **not** add these until needed:
-- journal cursor state
 - dedupe caches
 - service/timer baselines
 - alert delivery receipts

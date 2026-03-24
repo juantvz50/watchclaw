@@ -20,10 +20,10 @@ def main() -> None:
     config = load_config(args.config_path)
 
     if args.command == "status":
-        print(f"watchclaw: ready host_id={config.host_id} base_dir={config.base_dir}")
+        print(f"watchclaw: ready host_id={config.host_id} base_dir={config.base_dir} auth_enabled={config.auth_enabled}")
         return
 
-    result = run_listener_slice(config)
+    result = run_once(config)
     print(json.dumps({"status": "ok", **result}))
 
 

@@ -26,6 +26,15 @@ class WatchClawConfig:
     listeners_enabled: bool = True
     listeners_command: tuple[str, ...] = ("ss", "-ltnup")
     watched_files: tuple[str, ...] = ()
+    auth_enabled: bool = True
+    auth_journal_command: tuple[str, ...] = (
+        "journalctl",
+        "-q",
+        "-o",
+        "json",
+        "--no-pager",
+    )
+    auth_log_paths: tuple[str, ...] = ("/var/log/auth.log", "/var/log/secure")
 
 
 DEFAULT_CONFIG = {
@@ -34,6 +43,11 @@ DEFAULT_CONFIG = {
     "collection": {
         "listeners": {"enabled": True, "command": ["ss", "-ltnup"]},
         "files": {"paths": []},
+        "auth": {
+            "enabled": True,
+            "journal_command": ["journalctl", "-q", "-o", "json", "--no-pager"],
+            "log_paths": ["/var/log/auth.log", "/var/log/secure"],
+        },
     },
     "runtime": {"mode": "timer"},
 }

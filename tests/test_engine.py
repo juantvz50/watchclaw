@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from watchclaw.engine import build_event, build_file_event, diff_files, diff_listeners, run_once
+from watchclaw.auth import AuthLogCursor, AuthSignal
+from watchclaw.engine import build_auth_event, build_event, build_file_event, diff_files, diff_listeners, run_once
 from watchclaw.files import FileRecord
 from watchclaw.models import ListenerRecord, WatchClawConfig
 
@@ -99,7 +100,23 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(event["explain"]["source"], "files.snapshot")
         self.assertEqual(event["dedupe_key"], "sensitive_file_hash_changed:/etc/sudoers")
 
-    def test_run_once_persists_listener_and_file_baselines_and_events(self) -> None:
+    def test_build_auth_event_matches_contract(self) -> None:
+        event = build_auth_event(
+            "ssh_login_success",
+            details={"username": "jc", "source_ip": "1.2.3.4"},
+            host_id="jc-server",
+            observed_at="2026-03-23T22:00:00Z",
+            explain={"source": "journal"},
+            summary="SSH login succeeded for jc from 1.2.3.4",
+            dedupe_key="ssh_login_success:jc:1.2.3.4:publickey",
+            severity="info",
+        )
+        self.assertEqual(event["kind"], "ssh_login_success")
+        self.assertEqual(event["severity"], "info")
+        self.assertEqual(event["details"]["username"], "jc")
+        self.assertEqual(event["dedupe_key"], "ssh_login_success:jc:1.2.3.4:publickey")
+
+    def test_run_once_persists_listener_file_and_auth_state_and_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             base_dir = Path(tmp_dir)
             watched_file = base_dir / "sudoers"
@@ -157,6 +174,7 @@ class EngineTest(unittest.TestCase):
                 listeners_enabled=True,
                 listeners_command=("ss", "-ltnup"),
                 watched_files=(str(watched_file), str(base_dir / "deleted.txt"), str(base_dir / "created.txt")),
+                auth_enabled=True,
             )
 
             created_file = FileRecord(path=str(base_dir / "created.txt"), exists=True, sha256="new", size=3, mode=33188, mtime_ns=3)
@@ -168,10 +186,25 @@ class EngineTest(unittest.TestCase):
             ), patch(
                 "watchclaw.engine.collect_file_snapshot",
                 return_value=[created_file, missing_file, current_file],
+            ), patch(
+                "watchclaw.engine.collect_auth_signals",
+                return_value=(
+                    [
+                        AuthSignal(
+                            kind="ssh_login_success",
+                            details={"username": "jc", "source_ip": "1.2.3.4"},
+                            explain={"source": "journal"},
+                            summary="SSH login succeeded for jc from 1.2.3.4",
+                            dedupe_key="ssh_login_success:jc:1.2.3.4:publickey",
+                            severity="info",
+                        )
+                    ],
+                    AuthLogCursor(source="journal", journal_cursor="cursor-5"),
+                ),
             ):
                 result = run_once(config)
 
-            self.assertEqual(result, {"listeners": 1, "files": 3, "events": 5})
+            self.assertEqual(result, {"listeners": 1, "files": 3, "auth": 1, "events": 6})
 
             events = [json.loads(line) for line in (base_dir / "events.jsonl").read_text().splitlines()]
             self.assertEqual(
@@ -180,6 +213,7 @@ class EngineTest(unittest.TestCase):
                     "listener_removed",
                     "new_listener",
                     "sensitive_file_hash_changed",
+                    "ssh_login_success",
                     "watched_file_created",
                     "watched_file_deleted",
                 ],
@@ -188,6 +222,7 @@ class EngineTest(unittest.TestCase):
             self.assertEqual(len(files_baseline["files"]), 3)
             state = json.loads((base_dir / "state.json").read_text())
             self.assertEqual(state["host_id"], "jc-server")
+            self.assertEqual(state["auth_cursor"]["journal_cursor"], "cursor-5")
 
 
 if __name__ == "__main__":

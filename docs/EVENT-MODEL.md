@@ -4,7 +4,7 @@
 
 Define the smallest event model needed for the current runnable WatchClaw slices.
 
-The current runnable slices represent listener drift and watched-file integrity drift.
+The current runnable slices represent listener drift, watched-file integrity drift, and SSH/auth activity from journal or auth logs.
 
 ---
 
@@ -15,6 +15,9 @@ The current runnable slices represent listener drift and watched-file integrity 
 - `watched_file_created`
 - `watched_file_deleted`
 - `sensitive_file_hash_changed`
+- `ssh_login_success`
+- `ssh_invalid_user`
+- `ssh_failed_login_burst`
 
 ---
 
@@ -63,10 +66,14 @@ The current runnable slices represent listener drift and watched-file integrity 
   - `watched_file_created`
   - `watched_file_deleted`
   - `sensitive_file_hash_changed`
+  - `ssh_login_success`
+  - `ssh_invalid_user`
+  - `ssh_failed_login_burst`
 
 ### `severity`
 - enum
 - MVP values:
+  - `info`
   - `warning`
   - `critical`
 
@@ -110,6 +117,9 @@ For the current slices:
 - `watched_file_created` => `warning`
 - `watched_file_deleted` => `critical`
 - `sensitive_file_hash_changed` => `critical`
+- `ssh_login_success` => `info`
+- `ssh_invalid_user` => `warning`
+- `ssh_failed_login_burst` => `warning`
 
 Do not over-model severity before more event types exist.
 

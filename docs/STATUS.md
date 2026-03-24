@@ -13,7 +13,15 @@ What changed:
 - reduced pressure toward heavyweight integrations and premature platform scope
 
 Next concrete engineering step:
-- define the config/state/event contracts and implement the first runnable listener collector slice (`ss` snapshot -> baseline diff -> `new_listener` / `listener_removed` -> JSONL event storage -> basic explain path)
+- tighten the new SSH/auth journal slice around real-host validation, especially journald permission behavior and burst tuning, without widening the config surface prematurely
+
+## 2026-03-23 — auth slice
+
+Implemented a narrow SSH/auth monitoring slice:
+- journal-first incremental reads using persisted `journalctl` cursor state
+- honest logfile fallback for `/var/log/auth.log` and `/var/log/secure`
+- normalized high-value SSH events: `ssh_login_success`, `ssh_invalid_user`, `ssh_failed_login_burst`
+- state/schema/docs updates to keep the slice inspectable and explainable
 
 ## Design note
 

@@ -30,6 +30,7 @@ def load_config(path: str | Path | None = None) -> WatchClawConfig:
     collection = raw.get("collection", {})
     listeners = collection.get("listeners", {})
     files = collection.get("files", {})
+    auth = collection.get("auth", {})
     storage = raw.get("storage", {})
     return WatchClawConfig(
         host_id=str(raw["host_id"]),
@@ -37,4 +38,9 @@ def load_config(path: str | Path | None = None) -> WatchClawConfig:
         listeners_enabled=bool(listeners.get("enabled", True)),
         listeners_command=tuple(str(part) for part in listeners.get("command", ["ss", "-ltnup"])),
         watched_files=tuple(str(path) for path in files.get("paths", [])),
+        auth_enabled=bool(auth.get("enabled", True)),
+        auth_journal_command=tuple(
+            str(part) for part in auth.get("journal_command", ["journalctl", "-q", "-o", "json", "--no-pager"])
+        ),
+        auth_log_paths=tuple(str(path) for path in auth.get("log_paths", ["/var/log/auth.log", "/var/log/secure"])),
     )

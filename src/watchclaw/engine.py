@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from .auth import AuthLogCursor, collect_auth_signals
 from .files import FileRecord, collect_file_snapshot
 from .listeners import collect_listener_snapshot
 from .models import SCHEMA_VERSION, ListenerRecord, WatchClawConfig
@@ -168,6 +169,21 @@ def build_file_event(
     }
 
 
+def build_auth_event(kind: str, details: dict[str, object], host_id: str, observed_at: str, explain: dict[str, object], summary: str, dedupe_key: str, severity: str) -> dict[str, object]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "event_id": str(uuid4()),
+        "kind": kind,
+        "severity": severity,
+        "host_id": host_id,
+        "observed_at": observed_at,
+        "summary": summary,
+        "details": details,
+        "explain": explain,
+        "dedupe_key": dedupe_key,
+    }
+
+
 def append_events(path: Path, events: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -175,14 +191,31 @@ def append_events(path: Path, events: list[dict[str, object]]) -> None:
             handle.write(json.dumps(event) + "\n")
 
 
-def write_state(path: Path, host_id: str, last_run_at: str, last_success_at: str) -> None:
+def load_state(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
+def write_state(
+    path: Path,
+    host_id: str,
+    last_run_at: str,
+    last_success_at: str,
+    auth_cursor: AuthLogCursor | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": SCHEMA_VERSION,
-        "host_id": host_id,
-        "last_run_at": last_run_at,
-        "last_success_at": last_success_at,
-    }
+    payload = load_state(path)
+    payload.update(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "host_id": host_id,
+            "last_run_at": last_run_at,
+            "last_success_at": last_success_at,
+        }
+    )
+    if auth_cursor is not None:
+        payload["auth_cursor"] = auth_cursor.to_dict()
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
@@ -218,6 +251,7 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
     events_path = base_dir / "events.jsonl"
     state_path = base_dir / "state.json"
     events: list[dict[str, object]] = []
+    existing_state = load_state(state_path)
 
     listener_count = 0
     if config.listeners_enabled:
@@ -251,7 +285,31 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
         )
         write_file_baseline(files_baseline_path, observed_at, current_files)
 
+    auth_count = 0
+    auth_cursor = None
+    if config.auth_enabled:
+        previous_auth_cursor = AuthLogCursor(**existing_state.get("auth_cursor", {})) if existing_state.get("auth_cursor") else None
+        auth_signals, auth_cursor = collect_auth_signals(
+            config.auth_journal_command,
+            previous_cursor=previous_auth_cursor,
+            auth_log_paths=config.auth_log_paths,
+        )
+        auth_count = len(auth_signals)
+        events.extend(
+            build_auth_event(
+                signal.kind,
+                signal.details,
+                config.host_id,
+                observed_at,
+                signal.explain,
+                signal.summary,
+                signal.dedupe_key,
+                signal.severity,
+            )
+            for signal in auth_signals
+        )
+
     if events:
         append_events(events_path, events)
-    write_state(state_path, config.host_id, observed_at, observed_at)
-    return {"listeners": listener_count, "files": file_count, "events": len(events)}
+    write_state(state_path, config.host_id, observed_at, observed_at, auth_cursor=auth_cursor)
+    return {"listeners": listener_count, "files": file_count, "auth": auth_count, "events": len(events)}

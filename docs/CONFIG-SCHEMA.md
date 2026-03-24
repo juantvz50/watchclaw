@@ -7,6 +7,7 @@ Define the smallest configuration surface needed for the current runnable WatchC
 The MVP should configure only what is necessary to:
 - collect listener snapshots
 - collect watched-file snapshots
+- read SSH/auth activity incrementally
 - persist baseline/state locally
 - emit JSONL events
 - keep future expansion possible without over-designing now
@@ -38,6 +39,11 @@ Development/local override may be allowed later, but the installation story shou
     },
     "files": {
       "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
+    },
+    "auth": {
+      "enabled": true,
+      "journal_command": ["journalctl", "-q", "-o", "json", "--no-pager"],
+      "log_paths": ["/var/log/auth.log", "/var/log/secure"]
     }
   },
   "runtime": {
@@ -128,6 +134,55 @@ Rules:
 - paths should be explicit and human-auditable
 - missing files are still tracked so create/delete drift is visible
 - no globs in MVP
+
+---
+
+### `collection.auth.enabled`
+
+Type:
+- boolean
+
+Purpose:
+- turn SSH/auth monitoring on/off
+
+Default:
+- `true`
+
+---
+
+### `collection.auth.journal_command`
+
+Type:
+- string array
+
+Purpose:
+- exact command used for incremental journal reads when `journalctl` is available
+
+Initial default:
+- `["journalctl", "-q", "-o", "json", "--no-pager"]`
+
+Rules:
+- keep explicit for traceability
+- WatchClaw appends `--after-cursor <cursor>` when it has a saved journal cursor
+- if journal collection fails, WatchClaw falls back to auth logfile reading
+
+---
+
+### `collection.auth.log_paths`
+
+Type:
+- string array
+
+Purpose:
+- ordered fallback auth logfile paths for systems that do not expose the needed journal history
+
+Initial default:
+- `["/var/log/auth.log", "/var/log/secure"]`
+
+Rules:
+- first existing path wins
+- file offset and inode are persisted locally for incremental reads
+- keep paths explicit; no globs in MVP
 
 ---
 
