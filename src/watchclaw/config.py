@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -21,9 +22,46 @@ def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, An
     return merged
 
 
+def build_default_config(
+    host_id: str | None = None,
+    base_dir: str | None = None,
+    watched_files: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    raw = deepcopy(DEFAULT_CONFIG)
+    raw["host_id"] = host_id or socket.gethostname()
+    if base_dir is not None:
+        raw["storage"]["base_dir"] = base_dir
+    if watched_files is not None:
+        raw["collection"]["files"]["paths"] = list(dict.fromkeys(str(path) for path in watched_files))
+    return raw
+
+
+def dump_config(config: dict[str, Any]) -> str:
+    return json.dumps(config, indent=2) + "\n"
+
+
+def write_default_config(
+    destination: str | Path,
+    *,
+    force: bool = False,
+    host_id: str | None = None,
+    base_dir: str | None = None,
+    watched_files: list[str] | tuple[str, ...] | None = None,
+) -> Path:
+    destination_path = Path(destination)
+    if destination_path.exists() and not force:
+        raise FileExistsError(f"Config already exists: {destination_path}")
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    destination_path.write_text(
+        dump_config(build_default_config(host_id=host_id, base_dir=base_dir, watched_files=watched_files)),
+        encoding="utf-8",
+    )
+    return destination_path
+
+
 def load_config(path: str | Path | None = None) -> WatchClawConfig:
     source_path = Path(path) if path else DEFAULT_CONFIG_PATH
-    raw: dict[str, Any] = deepcopy(DEFAULT_CONFIG)
+    raw: dict[str, Any] = build_default_config()
     if source_path.exists():
         raw = _merge_dicts(raw, json.loads(source_path.read_text()))
 

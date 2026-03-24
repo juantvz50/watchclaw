@@ -1,0 +1,26 @@
+{
+  "host_id": "jc-server",
+  "storage": {
+    "base_dir": "/var/lib/watchclaw"
+  },
+  "collection": {
+    "listeners": {
+      "enabled": true,
+      "command": ["ss", "-ltnup"]
+    },
+    "files": {
+      "paths": [
+        "/etc/ssh/sshd_config",
+        "/etc/sudoers"
+      ]
+    },
+    "auth": {
+      "enabled": true,
+      "journal_command": ["journalctl", "-q", "-o", "json", "--no-pager"],
+      "log_paths": ["/var/log/auth.log", "/var/log/secure"]
+    }
+  },
+  "runtime": {
+    "mode": "timer"
+  }
+}

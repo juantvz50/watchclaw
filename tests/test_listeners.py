@@ -1,4 +1,11 @@
 import unittest
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 from watchclaw.listeners import extract_process, normalize_address, parse_ss_output, split_address_port
 from watchclaw.models import ListenerRecord

@@ -1,12 +1,18 @@
 [Unit]
-Description=WatchClaw watchdog service
-After=network-online.target
+Description=WatchClaw one-shot host watchdog scan
+Documentation=https://github.com/jcestevezr/watchclaw
 Wants=network-online.target
+After=network-online.target
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/env watchclaw status
-Restart=on-failure
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/watchclaw run-once --config /etc/watchclaw/config.json
+Nice=10
+
+# WatchClaw reads local auth logs/journal, listener state, and writes baselines/events
+# under storage.base_dir from the config file.
 
 [Install]
 WantedBy=multi-user.target
