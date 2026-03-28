@@ -8,6 +8,7 @@ from pathlib import Path
 from .config import DEFAULT_CONFIG_PATH, build_default_config, dump_config, load_config, write_default_config
 from .engine import run_once
 from .inspect import inspect_jsonl_chain
+from .telegram import render_event_file, render_event_notification
 
 
 STATUS_COMMAND = "status"
@@ -15,6 +16,7 @@ RUN_ONCE_COMMAND = "run-once"
 PRINT_DEFAULT_CONFIG_COMMAND = "print-default-config"
 INIT_CONFIG_COMMAND = "init-config"
 INSPECT_COMMAND = "inspect"
+RENDER_TELEGRAM_COMMAND = "render-telegram"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,6 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser(INSPECT_COMMAND, help="verify local hash chains and summarize recent records")
     inspect_parser.add_argument("--config", dest="config_path")
     inspect_parser.add_argument("--tail", type=int, default=5, help="number of recent records to summarize per log")
+
+    render_parser = subparsers.add_parser(
+        RENDER_TELEGRAM_COMMAND,
+        help="render WatchClaw events into Telegram-ready message payloads without sending them",
+    )
+    render_parser.add_argument("--event-file", help="JSONL file containing WatchClaw event objects")
+    render_parser.add_argument("--event-json", help="single WatchClaw event object as JSON")
 
     return parser
 
@@ -119,6 +128,16 @@ def main() -> None:
             },
         }
         print(json.dumps(payload))
+        return
+
+    if command == RENDER_TELEGRAM_COMMAND:
+        if bool(args.event_file) == bool(args.event_json):
+            print("watchclaw: pass exactly one of --event-file or --event-json", file=sys.stderr)
+            raise SystemExit(1)
+        if args.event_file:
+            print(json.dumps(render_event_file(args.event_file)))
+            return
+        print(json.dumps(render_event_notification(json.loads(args.event_json))))
         return
 
     result = run_once(config)

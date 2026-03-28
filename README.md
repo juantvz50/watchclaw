@@ -103,11 +103,14 @@ watchclaw status --config ./watchclaw.config.json
 watchclaw run-once --config ./watchclaw.config.json
 watchclaw print-default-config --host-id jc-server
 watchclaw init-config --output ./watchclaw.config.json
+watchclaw render-telegram --event-file /var/lib/watchclaw/events.jsonl
 ```
 
 `watchclaw status` prints the resolved runtime config summary as JSON.
 
 `watchclaw inspect` verifies the local `events.jsonl` and `actions.jsonl` hash chains, summarizes the last `--tail` records from each log, and flags obvious local-file problems such as hash mismatches, broken chain links, blank-line gaps, and interrupted trailing writes.
+
+`watchclaw render-telegram` renders one event or a whole JSONL file of events into Telegram-ready payloads without sending them. This is the UX/searchable-journal layer: WatchClaw keeps disk-first traceability, while downstream delivery layers can consume preformatted, human-facing messages.
 
 ## Local state layout
 
