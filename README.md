@@ -11,6 +11,7 @@ WatchClaw is the local observation layer: it snapshots host state, writes transp
 - SSH/auth monitoring with journal-first incremental reads and logfile fallback
 - append-only JSONL event log plus explicit baseline/state files
 - append-only JSONL action log for WatchClaw side effects (baseline writes, event appends, state writes) with hash chaining for local auditability
+- Telegram delivery-preparation flow with durable per-event state so notification-worthy events are not resent indefinitely
 - timer-friendly CLI and systemd units for a simple host install story
 
 ## Install shape
@@ -104,6 +105,8 @@ watchclaw run-once --config ./watchclaw.config.json
 watchclaw print-default-config --host-id jc-server
 watchclaw init-config --output ./watchclaw.config.json
 watchclaw render-telegram --event-file /var/lib/watchclaw/events.jsonl
+watchclaw prepare-telegram-delivery --config /etc/watchclaw/config.json
+watchclaw ack-telegram-delivery --config /etc/watchclaw/config.json --batch-id <batch-id> --status sent
 ```
 
 `watchclaw status` prints the resolved runtime config summary as JSON.
@@ -111,6 +114,10 @@ watchclaw render-telegram --event-file /var/lib/watchclaw/events.jsonl
 `watchclaw inspect` verifies the local `events.jsonl` and `actions.jsonl` hash chains, summarizes the last `--tail` records from each log, and flags obvious local-file problems such as hash mismatches, broken chain links, blank-line gaps, and interrupted trailing writes.
 
 `watchclaw render-telegram` renders one event or a whole JSONL file of events into Telegram-ready payloads without sending them. This is the UX/searchable-journal layer: WatchClaw keeps disk-first traceability, while downstream delivery layers can consume preformatted, human-facing messages.
+
+`watchclaw prepare-telegram-delivery` is the local bridge from stored events to outbound notifications: it selects unsent default-worthy events, renders Telegram payloads, and persists delivery state in `delivery-state.json` so the same event is not prepared forever.
+
+`watchclaw ack-telegram-delivery` is the thin post-transport step: after OpenClaw or another sender actually sends the prepared payloads, it marks the batch `sent` or `failed` locally.
 
 ## Local state layout
 
@@ -121,6 +128,8 @@ State is written under `storage.base_dir`:
   state.json
   events.jsonl
   actions.jsonl
+  delivery-state.json
+  deliveries.jsonl
   baselines/
     listeners.json
     files.json

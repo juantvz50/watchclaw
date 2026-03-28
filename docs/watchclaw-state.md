@@ -20,14 +20,15 @@ Build WatchClaw into an open-source, installable host watchdog for systems alrea
 
 ## Current status
 
-`running`
+`complete`
 
 ## Current step
 
-Define the durable contracts for the MVP:
-- config
-- local state
-- event model
+Extend the Telegram layer into a practical local-first delivery bridge:
+- durable delivery state
+- notification-worthiness defaults
+- prepare/ack CLI flow
+- tests and docs
 
 ## Completed work
 
@@ -37,20 +38,18 @@ Define the durable contracts for the MVP:
 - Living technical document iterated and narrowed.
 - Status doc added.
 - Long-task coordination skill installed for process discipline.
+- MVP detection slices implemented for listeners, watched files, and SSH/auth.
+- Telegram-ready rendering layer implemented.
+- Telegram delivery-preparation slice implemented with durable local delivery state, prepare/ack CLI commands, tests, and docs.
 
 ## Next action
 
-Create the first contract docs:
-1. `docs/CONFIG-SCHEMA.md`
-2. `docs/STATE-SCHEMA.md`
-3. `docs/EVENT-MODEL.md`
+Thin remaining integration option:
+1. have OpenClaw call `prepare-telegram-delivery`
+2. send each returned `payload` through its Telegram channel adapter
+3. call `ack-telegram-delivery --batch-id ... --status sent|failed`
 
-Then use them to implement the first runnable slice:
-- `ss` snapshot
-- baseline diff
-- `new_listener` / `listener_removed`
-- JSONL event storage
-- basic explain path
+No repo-side blocker remains for that handoff.
 
 ## Blockers
 
