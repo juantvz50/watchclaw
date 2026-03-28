@@ -21,6 +21,9 @@
     }
   },
   "runtime": {
-    "mode": "timer"
+    "mode": "timer",
+    "delivery": {
+      "telegram_inline": true
+    }
   }
 }

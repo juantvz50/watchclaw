@@ -37,6 +37,7 @@ class WatchClawConfig:
         "--no-pager",
     )
     auth_log_paths: tuple[str, ...] = ("/var/log/auth.log", "/var/log/secure")
+    telegram_delivery_inline: bool = True
 
 
 DEFAULT_CONFIG = {
@@ -56,5 +57,10 @@ DEFAULT_CONFIG = {
             "log_paths": ["/var/log/auth.log", "/var/log/secure"],
         },
     },
-    "runtime": {"mode": "timer"},
+    "runtime": {
+        "mode": "timer",
+        "delivery": {
+            "telegram_inline": True
+        }
+    },
 }

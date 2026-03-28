@@ -12,6 +12,7 @@ WatchClaw is the local observation layer: it snapshots host state, writes transp
 - append-only JSONL event log plus explicit baseline/state files
 - append-only JSONL action log for WatchClaw side effects (baseline writes, event appends, state writes) with hash chaining for local auditability
 - Telegram delivery-preparation flow with durable per-event state so notification-worthy events are not resent indefinitely
+- inline Telegram delivery preparation during `run-once` for near-immediate handoff after detection, while preserving explicit acknowledgement state
 - timer-friendly CLI and systemd units for a simple host install story
 
 ## Install shape
@@ -89,7 +90,10 @@ A checked-in sample config also exists at `examples/config.sample.json`.
     }
   },
   "runtime": {
-    "mode": "timer"
+    "mode": "timer",
+    "delivery": {
+      "telegram_inline": true
+    }
   }
 }
 ```
@@ -115,7 +119,9 @@ watchclaw ack-telegram-delivery --config /etc/watchclaw/config.json --batch-id <
 
 `watchclaw render-telegram` renders one event or a whole JSONL file of events into Telegram-ready payloads without sending them. This is the UX/searchable-journal layer: WatchClaw keeps disk-first traceability, while downstream delivery layers can consume preformatted, human-facing messages.
 
-`watchclaw prepare-telegram-delivery` is the local bridge from stored events to outbound notifications: it selects unsent default-worthy events, renders Telegram payloads, and persists delivery state in `delivery-state.json` so the same event is not prepared forever.
+`watchclaw run-once` now prepares Telegram deliveries inline for the fresh events it just wrote when `runtime.delivery.telegram_inline` is true (default). That removes the old second-pass delay between detection and notification handoff while keeping durable delivery state and explicit post-send acknowledgement.
+
+`watchclaw prepare-telegram-delivery` still exists as the recovery / backfill bridge from stored events to outbound notifications: it rescans local events, selects unsent default-worthy ones, renders Telegram payloads, and persists delivery state in `delivery-state.json` so the same event is not prepared forever.
 
 `watchclaw ack-telegram-delivery` is the thin post-transport step: after OpenClaw or another sender actually sends the prepared payloads, it marks the batch `sent` or `failed` locally.
 
@@ -160,6 +166,8 @@ SSH/auth:
 Timer-based units live in `systemd/`:
 - `watchclaw.service` — template for a one-shot scan using `watchclaw run-once --config ...`
 - `watchclaw.timer` — runs every 5 minutes, persistent across reboots
+
+Even in timer mode, notification preparation is no longer a separate timer/batch step by default: fresh events are prepared during the same `run-once` execution that detects them.
 
 `scripts/install.sh` renders the service with the actual installed `watchclaw` binary path and your chosen config path, then installs both units into `/etc/systemd/system/`.
 

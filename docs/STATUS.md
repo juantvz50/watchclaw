@@ -23,6 +23,15 @@ Implemented a narrow SSH/auth monitoring slice:
 - normalized high-value SSH events: `ssh_login_success`, `ssh_invalid_user`, `ssh_failed_login_burst`
 - state/schema/docs updates to keep the slice inspectable and explainable
 
+## 2026-03-28 — reactive delivery prep slice
+
+Implemented a smaller, more reactive event -> delivery path:
+- added inline Telegram delivery preparation during `watchclaw run-once`
+- kept the durable `prepared` / `sent` / `failed` / `skipped` state model intact
+- preserved `prepare-telegram-delivery` as a recovery/backfill path instead of the only preparation path
+- added config control via `runtime.delivery.telegram_inline`
+- extended tests/docs around the new behavior
+
 ## Design note
 
 A future enrichment layer should support lightweight per-service research saved as local markdown profiles (for example under a local services directory). This should stay optional and must not become a runtime dependency of core detection.

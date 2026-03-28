@@ -135,6 +135,7 @@ def main() -> None:
                     "listeners_enabled": config.listeners_enabled,
                     "watched_files": list(config.watched_files),
                     "auth_enabled": config.auth_enabled,
+                    "telegram_delivery_inline": config.telegram_delivery_inline,
                     "config_path": str(Path(getattr(args, "config_path", None) or DEFAULT_CONFIG_PATH)),
                 }
             )

@@ -70,6 +70,8 @@ def load_config(path: str | Path | None = None) -> WatchClawConfig:
     files = collection.get("files", {})
     auth = collection.get("auth", {})
     storage = raw.get("storage", {})
+    runtime = raw.get("runtime", {})
+    delivery = runtime.get("delivery", {}) if isinstance(runtime, dict) else {}
     return WatchClawConfig(
         host_id=str(raw["host_id"]),
         base_dir=str(storage["base_dir"]),
@@ -83,4 +85,5 @@ def load_config(path: str | Path | None = None) -> WatchClawConfig:
             str(part) for part in auth.get("journal_command", ["journalctl", "-q", "-o", "json", "--no-pager"])
         ),
         auth_log_paths=tuple(str(path) for path in auth.get("log_paths", ["/var/log/auth.log", "/var/log/secure"])),
+        telegram_delivery_inline=bool(delivery.get("telegram_inline", True)),
     )

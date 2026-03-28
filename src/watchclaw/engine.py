@@ -10,6 +10,7 @@ from .audit import append_jsonl_record, append_jsonl_records
 from .auth import AuthLogCursor, collect_auth_signals
 from .files import FileRecord, collect_file_snapshot
 from .listeners import collect_listener_snapshot
+from .delivery import prepare_telegram_deliveries_for_events
 from .models import SCHEMA_VERSION, ListenerRecord, WatchClawConfig
 
 
@@ -307,7 +308,7 @@ def run_listener_slice(config: WatchClawConfig) -> dict[str, int]:
     return {"listeners": len(current), "events": len(events)}
 
 
-def run_once(config: WatchClawConfig) -> dict[str, int]:
+def run_once(config: WatchClawConfig) -> dict[str, object]:
     now = utc_now()
     observed_at = format_timestamp(now)
     base_dir = Path(config.base_dir)
@@ -389,6 +390,7 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
             for signal in auth_signals
         )
 
+    prepared_deliveries: dict[str, object] | None = None
     if events:
         written_events = append_events(events_path, events)
         append_action(
@@ -399,6 +401,13 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
             status="ok",
             details={"count": len(written_events), "event_kinds": [event["kind"] for event in written_events]},
         )
+        if config.telegram_delivery_inline:
+            prepared_deliveries = prepare_telegram_deliveries_for_events(
+                base_dir=base_dir,
+                host_id=config.host_id,
+                events=written_events,
+                prepared_at=observed_at,
+            )
     write_state(state_path, config.host_id, observed_at, observed_at, auth_cursor=auth_cursor)
     append_action(
         actions_path,
@@ -408,4 +417,7 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
         status="ok",
         details={"path": str(state_path), "auth_cursor_written": auth_cursor is not None},
     )
-    return {"listeners": listener_count, "files": file_count, "auth": auth_count, "events": len(events)}
+    result: dict[str, object] = {"listeners": listener_count, "files": file_count, "auth": auth_count, "events": len(events)}
+    if prepared_deliveries is not None:
+        result["delivery"] = prepared_deliveries
+    return result

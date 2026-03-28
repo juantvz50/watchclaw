@@ -192,18 +192,20 @@ def append_delivery_action(
     )
 
 
-def prepare_pending_telegram_deliveries(
+def prepare_telegram_deliveries_for_events(
     *,
     base_dir: Path,
     host_id: str,
+    events: list[dict[str, Any]],
     limit: int | None = None,
     include_prepared: bool = False,
+    batch_id: str | None = None,
+    prepared_at: str | None = None,
 ) -> dict[str, Any]:
-    observed_at = format_timestamp(utc_now())
-    batch_id = str(uuid4())
+    observed_at = prepared_at or format_timestamp(utc_now())
+    resolved_batch_id = batch_id or str(uuid4())
     state_path = base_dir / "delivery-state.json"
     delivery_log_path = base_dir / "deliveries.jsonl"
-    events_path = base_dir / "events.jsonl"
     state = load_delivery_state(state_path)
 
     selected: list[dict[str, Any]] = []
@@ -212,7 +214,7 @@ def prepare_pending_telegram_deliveries(
     if include_prepared:
         allowed_existing_statuses.add(DELIVERY_STATUS_PREPARED)
 
-    for event in iter_event_log(events_path):
+    for event in events:
         decision = decide_telegram_delivery(event)
         current_status = event_delivery_status(state, str(event.get("event_id", "")))
         if not decision.should_notify:
@@ -237,13 +239,13 @@ def prepare_pending_telegram_deliveries(
             continue
         if current_status not in allowed_existing_statuses:
             continue
-        record = build_delivery_record(event, batch_id=batch_id, prepared_at=observed_at)
+        record = build_delivery_record(event, batch_id=resolved_batch_id, prepared_at=observed_at)
         selected.append(record)
         update_delivery_state_for_event(
             state,
             event=event,
             status=DELIVERY_STATUS_PREPARED,
-            batch_id=batch_id,
+            batch_id=resolved_batch_id,
             timestamp=observed_at,
             reason=record["decision"]["reason"],
         )
@@ -254,7 +256,7 @@ def prepare_pending_telegram_deliveries(
             action="prepare_delivery",
             status="ok",
             details={
-                "batch_id": batch_id,
+                "batch_id": resolved_batch_id,
                 "event_id": event.get("event_id"),
                 "kind": event.get("kind"),
                 "severity": event.get("severity"),
@@ -276,12 +278,29 @@ def prepare_pending_telegram_deliveries(
     return {
         "status": "ok",
         "channel": DELIVERY_CHANNEL_TELEGRAM,
-        "batch_id": batch_id,
+        "batch_id": resolved_batch_id,
         "prepared_at": observed_at,
         "prepared_count": len(selected),
         "skipped_count": len(skipped),
         "deliveries": selected,
     }
+
+
+def prepare_pending_telegram_deliveries(
+    *,
+    base_dir: Path,
+    host_id: str,
+    limit: int | None = None,
+    include_prepared: bool = False,
+) -> dict[str, Any]:
+    events_path = base_dir / "events.jsonl"
+    return prepare_telegram_deliveries_for_events(
+        base_dir=base_dir,
+        host_id=host_id,
+        events=iter_event_log(events_path),
+        limit=limit,
+        include_prepared=include_prepared,
+    )
 
 
 def acknowledge_telegram_delivery_batch(

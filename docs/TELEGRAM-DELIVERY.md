@@ -4,10 +4,12 @@
 
 Bridge local WatchClaw event detection to outbound human-facing Telegram notifications without making the core detector depend on live Telegram transport.
 
-This layer is intentionally split into two phases:
+The delivery state model is intentionally split into two durable phases:
 
-1. **prepare** — select notification-worthy unsent events, render Telegram payloads, persist delivery state
+1. **prepare** — select notification-worthy events, render Telegram payloads, persist delivery state
 2. **acknowledge** — after some external sender actually delivers or fails the batch, mark the batch `sent` or `failed`
+
+Fresh events are now prepared inline during `watchclaw run-once` by default, so the event -> notification handoff is near-immediate instead of waiting for a second batch job to rescan `events.jsonl`.
 
 That keeps the repo local-first, inspectable, and explicit about what still belongs to OpenClaw or another sender.
 
@@ -64,6 +66,29 @@ Append-only local log of delivery-side actions, for example:
 - skipping an event as journal-only
 - acknowledging a batch as sent/failed
 - writing delivery state
+
+## Runtime behavior
+
+Default config:
+
+```json
+{
+  "runtime": {
+    "delivery": {
+      "telegram_inline": true
+    }
+  }
+}
+```
+
+When enabled:
+- `watchclaw run-once` appends fresh events to `events.jsonl`
+- the same run immediately evaluates those fresh events against the Telegram policy
+- notification-worthy events are marked `prepared` in `delivery-state.json`
+- journal-only events are marked `skipped`
+- the external sender still owns transport plus the later `sent` / `failed` acknowledgement
+
+If you set `runtime.delivery.telegram_inline` to `false`, WatchClaw falls back to the older explicit batch-preparation workflow.
 
 ## CLI
 

@@ -48,6 +48,7 @@ class ConfigTest(unittest.TestCase):
                             "files": {"paths": ["/etc/sudoers"]},
                             "auth": {"enabled": False},
                         },
+                        "runtime": {"delivery": {"telegram_inline": False}},
                     }
                 )
             )
@@ -57,6 +58,7 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.watched_files, ("/etc/sudoers",))
             self.assertFalse(config.auth_enabled)
             self.assertTrue(config.listeners_enabled)
+            self.assertFalse(config.telegram_delivery_inline)
 
 
 if __name__ == "__main__":

@@ -231,7 +231,13 @@ class EngineTest(unittest.TestCase):
             ):
                 result = run_once(config)
 
-            self.assertEqual(result, {"listeners": 1, "files": 3, "auth": 1, "events": 6})
+            self.assertEqual(result["listeners"], 1)
+            self.assertEqual(result["files"], 3)
+            self.assertEqual(result["auth"], 1)
+            self.assertEqual(result["events"], 6)
+            self.assertIn("delivery", result)
+            self.assertEqual(result["delivery"]["prepared_count"], 5)
+            self.assertEqual(result["delivery"]["skipped_count"], 1)
 
             events = [json.loads(line) for line in (base_dir / "events.jsonl").read_text().splitlines()]
             self.assertEqual(
@@ -259,6 +265,11 @@ class EngineTest(unittest.TestCase):
             ])
             self.assertIsNone(actions[0]["previous_record_hash"])
             self.assertEqual(actions[1]["previous_record_hash"], actions[0]["record_hash"])
+
+            delivery_state = json.loads((base_dir / "delivery-state.json").read_text())
+            delivery_statuses = {entry["kind"]: entry["status"] for entry in delivery_state["channels"]["telegram"]["events"].values()}
+            self.assertEqual(delivery_statuses["ssh_login_success"], "skipped")
+            self.assertEqual(delivery_statuses["watched_file_deleted"], "prepared")
 
 
 if __name__ == "__main__":
