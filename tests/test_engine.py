@@ -14,7 +14,7 @@ if str(SRC) not in sys.path:
 from unittest.mock import patch
 
 from watchclaw.auth import AuthLogCursor, AuthSignal
-from watchclaw.engine import build_auth_event, build_event, build_file_event, diff_files, diff_listeners, run_once
+from watchclaw.engine import build_auth_event, build_event, build_file_event, diff_files, diff_listeners, filter_expected_listeners, run_once
 from watchclaw.files import FileRecord
 from watchclaw.models import ListenerRecord, WatchClawConfig
 
@@ -61,6 +61,26 @@ class EngineTest(unittest.TestCase):
                     FileRecord(path="/a", exists=True, sha256="new-a", size=1, mode=33188, mtime_ns=2),
                 )
             ],
+        )
+
+    def test_filter_expected_listeners_suppresses_declared_noise(self) -> None:
+        config = WatchClawConfig(
+            host_id="jc-server",
+            base_dir="/tmp/watchclaw",
+            listener_ignore_process_names=("systemd-resolved",),
+            listener_ignore_local_ports=(5353,),
+        )
+        filtered = filter_expected_listeners(
+            [
+                ListenerRecord(proto="udp", local_address="0.0.0.0", local_port=5353, process_name="avahi-daemon", pid=1),
+                ListenerRecord(proto="tcp", local_address="127.0.0.53", local_port=53, process_name="systemd-resolved", pid=2),
+                ListenerRecord(proto="tcp", local_address="127.0.0.1", local_port=8080, process_name="python3", pid=3),
+            ],
+            config,
+        )
+        self.assertEqual(
+            filtered,
+            [ListenerRecord(proto="tcp", local_address="127.0.0.1", local_port=8080, process_name="python3", pid=3)],
         )
 
     def test_build_event_matches_contract(self) -> None:
@@ -230,6 +250,15 @@ class EngineTest(unittest.TestCase):
             state = json.loads((base_dir / "state.json").read_text())
             self.assertEqual(state["host_id"], "jc-server")
             self.assertEqual(state["auth_cursor"]["journal_cursor"], "cursor-5")
+            actions = [json.loads(line) for line in (base_dir / "actions.jsonl").read_text().splitlines()]
+            self.assertEqual([action["action"] for action in actions], [
+                "write_listener_baseline",
+                "write_file_baseline",
+                "append_events",
+                "write_state",
+            ])
+            self.assertIsNone(actions[0]["previous_record_hash"])
+            self.assertEqual(actions[1]["previous_record_hash"], actions[0]["record_hash"])
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from .audit import append_jsonl_record, append_jsonl_records
 from .auth import AuthLogCursor, collect_auth_signals
 from .files import FileRecord, collect_file_snapshot
 from .listeners import collect_listener_snapshot
@@ -184,11 +185,35 @@ def build_auth_event(kind: str, details: dict[str, object], host_id: str, observ
     }
 
 
-def append_events(path: Path, events: list[dict[str, object]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        for event in events:
-            handle.write(json.dumps(event) + "\n")
+def append_events(path: Path, events: list[dict[str, object]]) -> list[dict[str, object]]:
+    return append_jsonl_records(path, events)
+
+
+def append_action(
+    path: Path,
+    *,
+    host_id: str,
+    observed_at: str,
+    action: str,
+    status: str,
+    details: dict[str, object],
+) -> dict[str, object]:
+    return append_jsonl_record(
+        path,
+        {
+            "schema_version": SCHEMA_VERSION,
+            "host_id": host_id,
+            "observed_at": observed_at,
+            "kind": "watchclaw_action",
+            "action": action,
+            "status": status,
+            "details": details,
+            "explain": {
+                "source": "watchclaw.runtime",
+                "comparison": "append-only local action log of WatchClaw side effects; this is auditable history, not a tamper-proof ledger",
+            },
+        },
+    )
 
 
 def load_state(path: Path) -> dict[str, object]:
@@ -219,6 +244,19 @@ def write_state(
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def filter_expected_listeners(listeners: list[ListenerRecord], config: WatchClawConfig) -> list[ListenerRecord]:
+    ignored_processes = set(config.listener_ignore_process_names)
+    ignored_ports = set(config.listener_ignore_local_ports)
+    filtered: list[ListenerRecord] = []
+    for record in listeners:
+        if record.process_name and record.process_name in ignored_processes:
+            continue
+        if record.local_port in ignored_ports:
+            continue
+        filtered.append(record)
+    return filtered
+
+
 def run_listener_slice(config: WatchClawConfig) -> dict[str, int]:
     if not config.listeners_enabled:
         return {"listeners": 0, "events": 0}
@@ -228,19 +266,44 @@ def run_listener_slice(config: WatchClawConfig) -> dict[str, int]:
     base_dir = Path(config.base_dir)
     baseline_path = base_dir / "baselines" / "listeners.json"
     events_path = base_dir / "events.jsonl"
+    actions_path = base_dir / "actions.jsonl"
     state_path = base_dir / "state.json"
 
     previous = load_listener_baseline(baseline_path)
-    current = collect_listener_snapshot(config.listeners_command)
+    current = filter_expected_listeners(collect_listener_snapshot(config.listeners_command), config)
     added, removed = diff_listeners(previous, current)
 
     events = [build_event("new_listener", record, config.host_id, observed_at) for record in added]
     events.extend(build_event("listener_removed", record, config.host_id, observed_at) for record in removed)
 
     if events:
-        append_events(events_path, events)
+        written_events = append_events(events_path, events)
+        append_action(
+            actions_path,
+            host_id=config.host_id,
+            observed_at=observed_at,
+            action="append_events",
+            status="ok",
+            details={"count": len(written_events), "event_kinds": [event["kind"] for event in written_events]},
+        )
     write_listener_baseline(baseline_path, observed_at, current)
+    append_action(
+        actions_path,
+        host_id=config.host_id,
+        observed_at=observed_at,
+        action="write_listener_baseline",
+        status="ok",
+        details={"path": str(baseline_path), "listener_count": len(current)},
+    )
     write_state(state_path, config.host_id, observed_at, observed_at)
+    append_action(
+        actions_path,
+        host_id=config.host_id,
+        observed_at=observed_at,
+        action="write_state",
+        status="ok",
+        details={"path": str(state_path)},
+    )
     return {"listeners": len(current), "events": len(events)}
 
 
@@ -249,6 +312,7 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
     observed_at = format_timestamp(now)
     base_dir = Path(config.base_dir)
     events_path = base_dir / "events.jsonl"
+    actions_path = base_dir / "actions.jsonl"
     state_path = base_dir / "state.json"
     events: list[dict[str, object]] = []
     existing_state = load_state(state_path)
@@ -257,12 +321,20 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
     if config.listeners_enabled:
         listener_baseline_path = base_dir / "baselines" / "listeners.json"
         previous_listeners = load_listener_baseline(listener_baseline_path)
-        current_listeners = collect_listener_snapshot(config.listeners_command)
+        current_listeners = filter_expected_listeners(collect_listener_snapshot(config.listeners_command), config)
         listener_count = len(current_listeners)
         added, removed = diff_listeners(previous_listeners, current_listeners)
         events.extend(build_event("new_listener", record, config.host_id, observed_at) for record in added)
         events.extend(build_event("listener_removed", record, config.host_id, observed_at) for record in removed)
         write_listener_baseline(listener_baseline_path, observed_at, current_listeners)
+        append_action(
+            actions_path,
+            host_id=config.host_id,
+            observed_at=observed_at,
+            action="write_listener_baseline",
+            status="ok",
+            details={"path": str(listener_baseline_path), "listener_count": len(current_listeners)},
+        )
 
     file_count = 0
     if config.watched_files:
@@ -284,6 +356,14 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
             for before, after in changed
         )
         write_file_baseline(files_baseline_path, observed_at, current_files)
+        append_action(
+            actions_path,
+            host_id=config.host_id,
+            observed_at=observed_at,
+            action="write_file_baseline",
+            status="ok",
+            details={"path": str(files_baseline_path), "file_count": len(current_files)},
+        )
 
     auth_count = 0
     auth_cursor = None
@@ -310,6 +390,22 @@ def run_once(config: WatchClawConfig) -> dict[str, int]:
         )
 
     if events:
-        append_events(events_path, events)
+        written_events = append_events(events_path, events)
+        append_action(
+            actions_path,
+            host_id=config.host_id,
+            observed_at=observed_at,
+            action="append_events",
+            status="ok",
+            details={"count": len(written_events), "event_kinds": [event["kind"] for event in written_events]},
+        )
     write_state(state_path, config.host_id, observed_at, observed_at, auth_cursor=auth_cursor)
+    append_action(
+        actions_path,
+        host_id=config.host_id,
+        observed_at=observed_at,
+        action="write_state",
+        status="ok",
+        details={"path": str(state_path), "auth_cursor_written": auth_cursor is not None},
+    )
     return {"listeners": listener_count, "files": file_count, "auth": auth_count, "events": len(events)}

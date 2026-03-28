@@ -10,6 +10,7 @@ WatchClaw is the local observation layer: it snapshots host state, writes transp
 - watched-file integrity snapshots with create / delete / hash-change events
 - SSH/auth monitoring with journal-first incremental reads and logfile fallback
 - append-only JSONL event log plus explicit baseline/state files
+- append-only JSONL action log for WatchClaw side effects (baseline writes, event appends, state writes) with hash chaining for local auditability
 - timer-friendly CLI and systemd units for a simple host install story
 
 ## Install shape
@@ -73,7 +74,9 @@ A checked-in sample config also exists at `examples/config.sample.json`.
   "collection": {
     "listeners": {
       "enabled": true,
-      "command": ["ss", "-ltnup"]
+      "command": ["ss", "-ltnup"],
+      "ignore_process_names": ["systemd-resolved"],
+      "ignore_local_ports": [5353]
     },
     "files": {
       "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
@@ -112,10 +115,13 @@ State is written under `storage.base_dir`:
 <base_dir>/
   state.json
   events.jsonl
+  actions.jsonl
   baselines/
     listeners.json
     files.json
 ```
+
+`events.jsonl` and `actions.jsonl` are append-only logs. `actions.jsonl` records WatchClaw's own side effects and links each record to the previous one with a hash chain for local auditability. This improves tamper-evidence direction, but it is not a claim of full immutability or remote attestation.
 
 `state.json` persists the last auth cursor / logfile offset so SSH/auth reads stay incremental across runs.
 

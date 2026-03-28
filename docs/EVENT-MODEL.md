@@ -4,6 +4,8 @@
 
 Define the smallest event model needed for the current runnable WatchClaw slices.
 
+Separate from the event model, WatchClaw now also maintains an append-only `actions.jsonl` file for its own side effects (for example baseline writes, event appends, and state writes). That action log is deliberately framed as local auditability / tamper-evidence direction, not a fake immutability claim.
+
 The current runnable slices represent listener drift, watched-file integrity drift, and SSH/auth activity from journal or auth logs.
 
 ---

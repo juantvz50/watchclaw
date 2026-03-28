@@ -25,6 +25,8 @@ class WatchClawConfig:
     base_dir: str
     listeners_enabled: bool = True
     listeners_command: tuple[str, ...] = ("ss", "-ltnup")
+    listener_ignore_process_names: tuple[str, ...] = ()
+    listener_ignore_local_ports: tuple[int, ...] = ()
     watched_files: tuple[str, ...] = ()
     auth_enabled: bool = True
     auth_journal_command: tuple[str, ...] = (
@@ -41,7 +43,12 @@ DEFAULT_CONFIG = {
     "host_id": "localhost",
     "storage": {"base_dir": "/var/lib/watchclaw"},
     "collection": {
-        "listeners": {"enabled": True, "command": ["ss", "-ltnup"]},
+        "listeners": {
+            "enabled": True,
+            "command": ["ss", "-ltnup"],
+            "ignore_process_names": [],
+            "ignore_local_ports": [],
+        },
         "files": {"paths": []},
         "auth": {
             "enabled": True,
