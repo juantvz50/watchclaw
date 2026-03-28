@@ -26,14 +26,14 @@ from watchclaw.delivery import (
 
 
 class TelegramDeliveryTest(unittest.TestCase):
-    def test_default_delivery_policy_filters_info_but_keeps_warning_security_events(self) -> None:
+    def test_default_delivery_policy_includes_ssh_success_and_warning_security_events(self) -> None:
         info_decision = decide_telegram_delivery({"kind": "ssh_login_success", "severity": "info"})
         warning_decision = decide_telegram_delivery({"kind": "ssh_invalid_user", "severity": "warning"})
-        self.assertFalse(info_decision.should_notify)
-        self.assertIn("journal-only", info_decision.reason)
+        self.assertTrue(info_decision.should_notify)
+        self.assertIn("operator-notifiable", info_decision.reason)
         self.assertTrue(warning_decision.should_notify)
 
-    def test_prepare_pending_delivery_marks_events_and_skips_non_notifiable_defaults(self) -> None:
+    def test_prepare_pending_delivery_marks_operator_notifiable_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             base_dir = Path(tmp_dir)
             events = [
@@ -64,14 +64,15 @@ class TelegramDeliveryTest(unittest.TestCase):
             events_path.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
 
             prepared = prepare_pending_telegram_deliveries(base_dir=base_dir, host_id="jc-server")
-            self.assertEqual(prepared["prepared_count"], 1)
-            self.assertEqual(prepared["deliveries"][0]["event_id"], "evt-warning")
+            self.assertEqual(prepared["prepared_count"], 2)
+            self.assertEqual([delivery["event_id"] for delivery in prepared["deliveries"]], ["evt-warning", "evt-info"])
             self.assertIn("SSH INVALID USER", prepared["deliveries"][0]["payload"]["text"])
+            self.assertIn("SSH LOGIN SUCCESS", prepared["deliveries"][1]["payload"]["text"])
 
             state = load_delivery_state(base_dir / "delivery-state.json")
             channel_events = state["channels"]["telegram"]["events"]
             self.assertEqual(channel_events["evt-warning"]["status"], DELIVERY_STATUS_PREPARED)
-            self.assertEqual(channel_events["evt-info"]["status"], "skipped")
+            self.assertEqual(channel_events["evt-info"]["status"], DELIVERY_STATUS_PREPARED)
 
             second = prepare_pending_telegram_deliveries(base_dir=base_dir, host_id="jc-server")
             self.assertEqual(second["prepared_count"], 0)

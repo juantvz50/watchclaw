@@ -6,6 +6,21 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 
+DEFAULT_WATCHED_FILE_PATHS = (
+    "/etc/ssh/sshd_config",
+    "/etc/ssh/sshd_config.d/*.conf",
+    "/etc/passwd",
+    "/etc/group",
+    "/etc/shadow",
+    "/etc/gshadow",
+    "/etc/sudoers",
+    "/etc/sudoers.d/*",
+    "/etc/crontab",
+    "/etc/cron.d/*",
+    "/root/.ssh/authorized_keys",
+    "/home/*/.ssh/authorized_keys",
+)
+
 
 @dataclass(frozen=True, order=True)
 class ListenerRecord:
@@ -50,7 +65,7 @@ DEFAULT_CONFIG = {
             "ignore_process_names": [],
             "ignore_local_ports": [],
         },
-        "files": {"paths": []},
+        "files": {"paths": list(DEFAULT_WATCHED_FILE_PATHS)},
         "auth": {
             "enabled": True,
             "journal_command": ["journalctl", "-q", "-o", "json", "--no-pager"],
@@ -60,7 +75,7 @@ DEFAULT_CONFIG = {
     "runtime": {
         "mode": "timer",
         "delivery": {
-            "telegram_inline": True
-        }
+            "telegram_inline": True,
+        },
     },
 }

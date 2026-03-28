@@ -23,20 +23,24 @@ By default, Telegram delivery is for events that are both:
   - `watched_file_created`
   - `watched_file_deleted`
   - `sensitive_file_hash_changed`
+  - `ssh_login_success`
   - `ssh_invalid_user`
   - `ssh_failed_login_burst`
 - and one of these severities:
   - `warning`
   - `critical`
 
+Special case:
+- `ssh_login_success` is prepared for Telegram by default even though it remains an `info` event in the journal/event model
+
 ### Journal-only by default
 
 These still stay in `events.jsonl`, but they are **not** pushed to Telegram by default:
 
-- `ssh_login_success`
-- anything with severity `info`
+- other event kinds outside the default Telegram list
+- other `info` severity events
 
-Reason: those are useful for local traceability and search, but they are too noisy for default push delivery.
+Reason: operator-visible SSH success is high-value enough to surface immediately, while the rest of the info stream stays local unless policy expands later.
 
 ## Local state files
 

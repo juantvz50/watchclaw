@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,9 +26,23 @@ class FileRecord:
         }
 
 
+def _expand_snapshot_paths(paths: list[str] | tuple[str, ...]) -> list[str]:
+    expanded: set[str] = set()
+    for raw_path in paths:
+        candidate = str(raw_path)
+        matches = glob.glob(candidate)
+        if matches:
+            expanded.update(str(Path(match)) for match in matches)
+            continue
+        if glob.has_magic(candidate):
+            continue
+        expanded.add(str(Path(candidate)))
+    return sorted(expanded)
+
+
 def collect_file_snapshot(paths: list[str] | tuple[str, ...]) -> list[FileRecord]:
     records: list[FileRecord] = []
-    for raw_path in sorted({str(Path(path)) for path in paths}):
+    for raw_path in _expand_snapshot_paths(paths):
         path = Path(raw_path)
         if not path.exists():
             records.append(FileRecord(path=str(path), exists=False))

@@ -37,9 +37,7 @@ pip3 install -r requirements.txt
 pip3 install .
 sudo bash scripts/install.sh \
   --venv "$(pwd)/.venv" \
-  --host-id "$(hostname)" \
-  --watch-file /etc/ssh/sshd_config \
-  --watch-file /etc/sudoers
+  --host-id "$(hostname)"
 ```
 
 What the installer does, explicitly:
@@ -81,7 +79,20 @@ A checked-in sample config also exists at `examples/config.sample.json`.
       "ignore_local_ports": [5353]
     },
     "files": {
-      "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
+      "paths": [
+        "/etc/ssh/sshd_config",
+        "/etc/ssh/sshd_config.d/*.conf",
+        "/etc/passwd",
+        "/etc/group",
+        "/etc/shadow",
+        "/etc/gshadow",
+        "/etc/sudoers",
+        "/etc/sudoers.d/*",
+        "/etc/crontab",
+        "/etc/cron.d/*",
+        "/root/.ssh/authorized_keys",
+        "/home/*/.ssh/authorized_keys"
+      ]
     },
     "auth": {
       "enabled": true,
@@ -122,6 +133,8 @@ watchclaw ack-telegram-delivery --config /etc/watchclaw/config.json --batch-id <
 `watchclaw run-once` now prepares Telegram deliveries inline for the fresh events it just wrote when `runtime.delivery.telegram_inline` is true (default). That removes the old second-pass delay between detection and notification handoff while keeping durable delivery state and explicit post-send acknowledgement.
 
 `watchclaw prepare-telegram-delivery` still exists as the recovery / backfill bridge from stored events to outbound notifications: it rescans local events, selects unsent default-worthy ones, renders Telegram payloads, and persists delivery state in `delivery-state.json` so the same event is not prepared forever.
+
+By default, successful SSH logins are also treated as notification-worthy operator events, even though they remain `info` severity in the event log.
 
 `watchclaw ack-telegram-delivery` is the thin post-transport step: after OpenClaw or another sender actually sends the prepared payloads, it marks the batch `sent` or `failed` locally.
 

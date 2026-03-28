@@ -38,7 +38,20 @@ Development/local override may be allowed later, but the installation story shou
       "command": ["ss", "-ltnup"]
     },
     "files": {
-      "paths": ["/etc/ssh/sshd_config", "/etc/sudoers"]
+      "paths": [
+        "/etc/ssh/sshd_config",
+        "/etc/ssh/sshd_config.d/*.conf",
+        "/etc/passwd",
+        "/etc/group",
+        "/etc/shadow",
+        "/etc/gshadow",
+        "/etc/sudoers",
+        "/etc/sudoers.d/*",
+        "/etc/crontab",
+        "/etc/cron.d/*",
+        "/root/.ssh/authorized_keys",
+        "/home/*/.ssh/authorized_keys"
+      ]
     },
     "auth": {
       "enabled": true,
@@ -127,13 +140,13 @@ Purpose:
 - exact file paths to snapshot for integrity monitoring
 
 MVP expectation:
-- empty by default
-- operator opt-in for the first file-integrity slice
+- operator-first defaults for core Linux security paths
+- may include both literal paths and honest glob patterns for families like `sudoers.d` and home-directory `authorized_keys`
 
 Rules:
-- paths should be explicit and human-auditable
-- missing files are still tracked so create/delete drift is visible
-- no globs in MVP
+- paths should stay human-auditable
+- missing literal files are still tracked so create/delete drift is visible
+- glob patterns expand to existing concrete files at collection time; unmatched globs are ignored rather than recorded as fake missing files
 
 ---
 

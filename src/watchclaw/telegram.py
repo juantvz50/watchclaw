@@ -46,7 +46,7 @@ ACTION_TAKEN = {
     "watched_file_created": "WatchClaw recorded the event and refreshed the file baseline to preserve traceability.",
     "watched_file_deleted": "WatchClaw recorded the deletion and refreshed the file baseline so future runs stay explainable.",
     "sensitive_file_hash_changed": "WatchClaw recorded the before/after file metadata and refreshed the file baseline.",
-    "ssh_login_success": "WatchClaw recorded the auth event in the append-only event log.",
+    "ssh_login_success": "WatchClaw recorded the auth event and prepared it for Telegram delivery by default.",
     "ssh_invalid_user": "WatchClaw recorded the auth event in the append-only event log.",
     "ssh_failed_login_burst": "WatchClaw recorded the auth event in the append-only event log.",
 }

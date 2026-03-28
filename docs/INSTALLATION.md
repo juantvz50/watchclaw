@@ -60,9 +60,7 @@ pip3 install -r requirements.txt
 pip3 install .
 sudo bash scripts/install.sh \
   --venv "$(pwd)/.venv" \
-  --host-id "$(hostname)" \
-  --watch-file /etc/ssh/sshd_config \
-  --watch-file /etc/sudoers
+  --host-id "$(hostname)"
 ```
 
 What the installer does:
@@ -103,9 +101,7 @@ If you do not want the helper script, these are the same steps in plain commands
      --output ./watchclaw.config.json \
      --force \
      --host-id "$(hostname)" \
-     --base-dir /var/lib/watchclaw \
-     --watch-file /etc/ssh/sshd_config \
-     --watch-file /etc/sudoers
+     --base-dir /var/lib/watchclaw
    sudo install -m 0644 ./watchclaw.config.json /etc/watchclaw/config.json
    ```
 

@@ -11,7 +11,17 @@
     "files": {
       "paths": [
         "/etc/ssh/sshd_config",
-        "/etc/sudoers"
+        "/etc/ssh/sshd_config.d/*.conf",
+        "/etc/passwd",
+        "/etc/group",
+        "/etc/shadow",
+        "/etc/gshadow",
+        "/etc/sudoers",
+        "/etc/sudoers.d/*",
+        "/etc/crontab",
+        "/etc/cron.d/*",
+        "/root/.ssh/authorized_keys",
+        "/home/*/.ssh/authorized_keys"
       ]
     },
     "auth": {

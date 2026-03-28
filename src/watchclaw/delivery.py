@@ -25,6 +25,7 @@ DEFAULT_NOTIFIABLE_KINDS = {
     "watched_file_created",
     "watched_file_deleted",
     "sensitive_file_hash_changed",
+    "ssh_login_success",
     "ssh_invalid_user",
     "ssh_failed_login_burst",
 }
@@ -83,6 +84,8 @@ def decide_telegram_delivery(event: dict[str, Any]) -> DeliveryDecision:
     severity = str(event.get("severity", "warning")).lower()
     if kind not in DEFAULT_NOTIFIABLE_KINDS:
         return DeliveryDecision(False, f"kind {kind or 'unknown'} is journal-only by default")
+    if kind == "ssh_login_success":
+        return DeliveryDecision(True, "ssh login success is operator-notifiable by default")
     if severity not in DEFAULT_NOTIFIABLE_SEVERITIES:
         return DeliveryDecision(False, f"severity {severity or 'unknown'} is below the default Telegram threshold")
     return DeliveryDecision(True, "kind and severity match the default Telegram notification policy")

@@ -13,9 +13,14 @@ if str(SRC) not in sys.path:
 
 
 from watchclaw.config import build_default_config, load_config, write_default_config
+from watchclaw.models import DEFAULT_WATCHED_FILE_PATHS
 
 
 class ConfigTest(unittest.TestCase):
+    def test_build_default_config_includes_operator_first_watched_files(self) -> None:
+        config = build_default_config(host_id="jc-server")
+        self.assertEqual(tuple(config["collection"]["files"]["paths"]), DEFAULT_WATCHED_FILE_PATHS)
+
     def test_build_default_config_accepts_overrides(self) -> None:
         config = build_default_config(
             host_id="jc-server",
