@@ -7,12 +7,14 @@ from pathlib import Path
 
 from .config import DEFAULT_CONFIG_PATH, build_default_config, dump_config, load_config, write_default_config
 from .engine import run_once
+from .inspect import inspect_jsonl_chain
 
 
 STATUS_COMMAND = "status"
 RUN_ONCE_COMMAND = "run-once"
 PRINT_DEFAULT_CONFIG_COMMAND = "print-default-config"
 INIT_CONFIG_COMMAND = "init-config"
+INSPECT_COMMAND = "inspect"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +33,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     init_parser = subparsers.add_parser(INIT_CONFIG_COMMAND, help="write a default config file for installation")
     add_config_generation_args(init_parser, include_output=True)
+
+    inspect_parser = subparsers.add_parser(INSPECT_COMMAND, help="verify local hash chains and summarize recent records")
+    inspect_parser.add_argument("--config", dest="config_path")
+    inspect_parser.add_argument("--tail", type=int, default=5, help="number of recent records to summarize per log")
 
     return parser
 
@@ -99,6 +105,20 @@ def main() -> None:
                 }
             )
         )
+        return
+
+    if command == INSPECT_COMMAND:
+        base_dir = Path(config.base_dir)
+        payload = {
+            "status": "ok",
+            "host_id": config.host_id,
+            "base_dir": str(base_dir),
+            "logs": {
+                "events": inspect_jsonl_chain(base_dir / "events.jsonl", tail=max(args.tail, 0)),
+                "actions": inspect_jsonl_chain(base_dir / "actions.jsonl", tail=max(args.tail, 0)),
+            },
+        }
+        print(json.dumps(payload))
         return
 
     result = run_once(config)

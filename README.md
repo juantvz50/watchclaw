@@ -107,6 +107,8 @@ watchclaw init-config --output ./watchclaw.config.json
 
 `watchclaw status` prints the resolved runtime config summary as JSON.
 
+`watchclaw inspect` verifies the local `events.jsonl` and `actions.jsonl` hash chains, summarizes the last `--tail` records from each log, and flags obvious local-file problems such as hash mismatches, broken chain links, blank-line gaps, and interrupted trailing writes.
+
 ## Local state layout
 
 State is written under `storage.base_dir`:

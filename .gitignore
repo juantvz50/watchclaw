@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .env
 *.log
+*.egg-info/
 *.sqlite3
 *.db
 state/
