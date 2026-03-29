@@ -215,5 +215,5 @@ Verification hints:
 
 Notes:
 - first run mainly establishes baselines; some drift events only appear on later runs
-- to update WatchClaw later, reactivate the same venv, run pip3 install ., then rerun this installer
+- supported upgrade path: sudo bash scripts/upgrade.sh --venv $VENV_PATH --config $CONFIG_PATH
 EOF

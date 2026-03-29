@@ -125,6 +125,35 @@ If you do not want the helper script, these are the same steps in plain commands
    sudo systemctl enable --now watchclaw.timer
    ```
 
+## Upgrade / redeploy an existing host
+
+This step matters after code changes. Updating the git checkout alone does not update the installed package inside the live venv, and it does not rerender the systemd unit.
+
+Supported upgrade flow:
+
+```bash
+cd /path/to/watchclaw
+sudo bash scripts/upgrade.sh \
+  --venv "$(pwd)/.venv" \
+  --config /etc/watchclaw/config.json
+```
+
+What it does:
+1. `git pull --ff-only` unless `--skip-git-pull` is passed.
+2. Reinstalls dependencies and `watchclaw` into the same venv.
+3. Reruns `scripts/install.sh` with the same venv/config path so the service unit stays aligned with the actual installed binary.
+4. Prints `watchclaw status` so you can verify the runtime identity immediately.
+
+Useful validation after an upgrade:
+
+```bash
+sudo .venv/bin/watchclaw status --config /etc/watchclaw/config.json
+sudo systemctl status watchclaw.timer watchclaw.service
+sudo journalctl -u watchclaw.service -n 50 --no-pager
+```
+
+Read the `status` JSON instead of guessing. It now reports the package version, installed distribution version, Python executable, module path, rendered systemd `ExecStart`, and declared capabilities.
+
 ## What success looks like
 
 - `.venv/bin/watchclaw --help` works.
@@ -139,7 +168,7 @@ If you do not want the helper script, these are the same steps in plain commands
 - First run establishes baselines, so some change events depend on a second run.
 - SSH/auth collection prefers `journalctl` and falls back to `/var/log/auth.log` or `/var/log/secure`.
 - The event log is append-only JSONL on purpose: read it directly before adding more abstraction.
-- To upgrade WatchClaw, reactivate the same venv, run `pip3 install .`, then rerun `sudo bash scripts/install.sh --venv <path>`.
+- Prefer `scripts/upgrade.sh` over ad-hoc `pip3 install .` so the installed package, venv entrypoint, and systemd unit stay aligned.
 
 ## Uninstall / rollback
 

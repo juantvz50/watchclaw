@@ -9,6 +9,7 @@ from .config import DEFAULT_CONFIG_PATH, build_default_config, dump_config, load
 from .delivery import acknowledge_telegram_delivery_batch, prepare_pending_telegram_deliveries
 from .engine import run_once
 from .inspect import inspect_jsonl_chain
+from .runtime import build_runtime_report
 from .telegram import render_event_file, render_event_notification
 
 
@@ -126,20 +127,20 @@ def main() -> None:
     config = load_config(getattr(args, "config_path", None))
 
     if command == STATUS_COMMAND:
-        print(
-            json.dumps(
-                {
-                    "status": "ready",
-                    "host_id": config.host_id,
-                    "base_dir": config.base_dir,
-                    "listeners_enabled": config.listeners_enabled,
-                    "watched_files": list(config.watched_files),
-                    "auth_enabled": config.auth_enabled,
-                    "telegram_delivery_inline": config.telegram_delivery_inline,
-                    "config_path": str(Path(getattr(args, "config_path", None) or DEFAULT_CONFIG_PATH)),
-                }
-            )
+        report = build_runtime_report(
+            config_path=str(Path(getattr(args, "config_path", None) or DEFAULT_CONFIG_PATH)),
+            base_dir=config.base_dir,
+            host_id=config.host_id,
         )
+        report.update(
+            {
+                "listeners_enabled": config.listeners_enabled,
+                "watched_files": list(config.watched_files),
+                "auth_enabled": config.auth_enabled,
+                "telegram_delivery_inline": config.telegram_delivery_inline,
+            }
+        )
+        print(json.dumps(report))
         return
 
     if command == INSPECT_COMMAND:

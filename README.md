@@ -124,7 +124,7 @@ watchclaw prepare-telegram-delivery --config /etc/watchclaw/config.json
 watchclaw ack-telegram-delivery --config /etc/watchclaw/config.json --batch-id <batch-id> --status sent
 ```
 
-`watchclaw status` prints the resolved runtime config summary as JSON.
+`watchclaw status` prints the resolved runtime config summary as JSON, plus runtime identity details that help detect host drift: package version, installed distribution version, Python executable, resolved module path, service unit path, rendered `ExecStart`, and a capability map.
 
 `watchclaw inspect` verifies the local `events.jsonl` and `actions.jsonl` hash chains, summarizes the last `--tail` records from each log, and flags obvious local-file problems such as hash mismatches, broken chain links, blank-line gaps, and interrupted trailing writes.
 
@@ -187,6 +187,30 @@ Even in timer mode, notification preparation is no longer a separate timer/batch
 If you install manually, render `systemd/watchclaw.service` by replacing:
 - `@WATCHCLAW_BIN@` with the real `watchclaw` executable path
 - `@WATCHCLAW_CONFIG@` with the real config path
+
+## Upgrade / redeploy an existing host
+
+If the repo changed after the original install, do not assume the running host updated itself. Reinstall the package into the same venv and rerender the systemd unit so the live service still points at the right binary.
+
+Supported path:
+
+```bash
+sudo bash scripts/upgrade.sh \
+  --venv "$(pwd)/.venv" \
+  --config /etc/watchclaw/config.json
+```
+
+What `scripts/upgrade.sh` does:
+- optionally `git pull --ff-only` in the current checkout
+- reinstalls WatchClaw into the chosen venv
+- reruns `scripts/install.sh` against that same venv and config path
+- prints `watchclaw status` at the end so you can verify the live runtime identity
+
+If you want to skip the repo update step because you already pulled or checked out a specific commit:
+
+```bash
+sudo bash scripts/upgrade.sh --venv "$(pwd)/.venv" --skip-git-pull
+```
 
 ## Validate the install
 

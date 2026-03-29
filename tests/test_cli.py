@@ -71,6 +71,12 @@ class CliTest(unittest.TestCase):
             self.assertEqual(payload["host_id"], "jc-server")
             self.assertEqual(payload["watched_files"], ["/etc/sudoers"])
             self.assertEqual(payload["config_path"], str(config_path))
+            self.assertIn("package_version", payload)
+            self.assertIn("installed_distribution_version", payload)
+            self.assertIn("python_executable", payload)
+            self.assertIn("module_path", payload)
+            self.assertIn("capabilities", payload)
+            self.assertTrue(payload["capabilities"]["listener_monitoring"])
 
     def test_inspect_verifies_logs_and_summarizes_tail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
